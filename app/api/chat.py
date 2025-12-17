@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage
 
 from app.agents.orchestrator import get_orchestrator
 from app.models.request import IntentType
@@ -51,6 +52,9 @@ async def send_chat_message(request: ChatRequest) -> ChatResponse:
         # 오케스트레이터 실행
         orchestrator = get_orchestrator()
 
+        # LangGraph MemorySaver용 config (thread_id로 대화 구분)
+        config = {"configurable": {"thread_id": session.session_id}}
+
         initial_state = {
             "raw_query": request.message,
             "session_id": session.session_id,
@@ -58,19 +62,20 @@ async def send_chat_message(request: ChatRequest) -> ChatResponse:
             "intent_confidence": 0.0,
             "secondary_intents": [],
             "requirements": None,
+            "search_keywords": [],  # LLM이 생성할 검색 키워드
             "search_results": [],
             "recommendations": None,
             "clarification_needed": False,
             "clarification_question": None,
             "clarification_field": None,
             "error": None,
-            "messages": [],
+            "messages": [HumanMessage(content=request.message)],
             "processing_step": "started",
             "cached": False,
         }
 
-        # 그래프 실행
-        result = await orchestrator.ainvoke(initial_state)
+        # 그래프 실행 (config로 thread_id 전달)
+        result = await orchestrator.ainvoke(initial_state, config=config)
 
         # 처리 시간 계산
         processing_time_ms = int((time.time() - start_time) * 1000)

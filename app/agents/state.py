@@ -29,6 +29,7 @@ class AgentState(TypedDict):
 
     # 요구사항 추출 결과
     requirements: Optional[Requirements]
+    search_keywords: List[str]  # LLM이 생성한 검색 키워드
 
     # 검색 결과
     search_results: List[ProductCandidate]

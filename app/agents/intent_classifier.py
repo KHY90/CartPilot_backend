@@ -55,14 +55,17 @@ async def classify_intent(state: AgentState) -> Dict[str, Any]:
     Returns:
         업데이트된 상태 딕셔너리
     """
-    raw_query = state["raw_query"]
+    # 누적된 모든 메시지에서 전체 컨텍스트 구성
+    state_messages = state.get("messages", [])
+    all_user_texts = [msg.content for msg in state_messages if hasattr(msg, "content")]
+    full_context = " ".join(all_user_texts) if all_user_texts else state["raw_query"]
 
     try:
         llm_provider = get_llm_provider()
 
         messages = [
             SystemMessage(content=INTENT_CLASSIFICATION_PROMPT),
-            HumanMessage(content=f"사용자 메시지: {raw_query}"),
+            HumanMessage(content=f"사용자 메시지: {full_context}"),
         ]
 
         response = await llm_provider.generate(messages, temperature=0.1)

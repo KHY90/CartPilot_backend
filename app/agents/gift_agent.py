@@ -177,8 +177,12 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         }
 
     try:
-        # 1. 검색어 생성
-        search_queries = _generate_gift_search_queries(requirements)
+        # 1. 검색어 생성 (LLM이 생성한 search_keywords 우선 사용)
+        search_keywords = state.get("search_keywords", [])
+        if search_keywords:
+            search_queries = search_keywords
+        else:
+            search_queries = _generate_gift_search_queries(requirements)
 
         # 2. 상품 검색
         naver_client = get_naver_client()

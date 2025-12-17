@@ -5,10 +5,10 @@ LangGraph 기반 에이전트 흐름 관리
 from typing import Any, Dict, Literal
 
 from langgraph.graph import END, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
+from app.agents.analyzer import analyze_request
 from app.agents.gift_agent import gift_agent
-from app.agents.intent_classifier import classify_intent
-from app.agents.requirement_extractor import extract_requirements
 from app.agents.state import AgentState
 from app.models.request import IntentType
 
@@ -59,13 +59,12 @@ def create_orchestrator_graph() -> StateGraph:
     오케스트레이터 그래프 생성
 
     흐름:
-    1. classify_intent: 의도 분류
-    2. extract_requirements: 요구사항 추출
-    3. should_clarify: clarification 필요 여부 체크
+    1. analyze_request: 의도 분류 + 요구사항 추출 (단일 LLM 호출)
+    2. should_clarify: clarification 필요 여부 체크
        - clarify: 추가 질문 필요 → END
        - route_to_agent: 에이전트로 라우팅
-    4. route_by_intent: 의도별 에이전트 실행
-    5. END
+    3. route_by_intent: 의도별 에이전트 실행
+    4. END
 
     Returns:
         컴파일된 StateGraph
@@ -74,24 +73,22 @@ def create_orchestrator_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     # 노드 추가
-    graph.add_node("classify_intent", classify_intent)
-    graph.add_node("extract_requirements", extract_requirements)
+    graph.add_node("analyze_request", analyze_request)  # 통합 분석 노드
     graph.add_node("clarify", clarify_node)
 
     # 에이전트 노드
-    graph.add_node("gift_agent", gift_agent)  # GIFT 모드 - Phase 3에서 구현
-    graph.add_node("value_agent", placeholder_agent)  # VALUE 모드 - Phase 4에서 구현
-    graph.add_node("bundle_agent", placeholder_agent)  # BUNDLE 모드 - Phase 5에서 구현
-    graph.add_node("review_agent", placeholder_agent)  # REVIEW 모드 - Phase 6에서 구현
-    graph.add_node("trend_agent", placeholder_agent)  # TREND 모드 - Phase 7에서 구현
+    graph.add_node("gift_agent", gift_agent)  # GIFT 모드
+    graph.add_node("value_agent", placeholder_agent)  # VALUE 모드 - Phase 4
+    graph.add_node("bundle_agent", placeholder_agent)  # BUNDLE 모드 - Phase 5
+    graph.add_node("review_agent", placeholder_agent)  # REVIEW 모드 - Phase 6
+    graph.add_node("trend_agent", placeholder_agent)  # TREND 모드 - Phase 7
 
     # 엣지 설정
-    graph.set_entry_point("classify_intent")
-    graph.add_edge("classify_intent", "extract_requirements")
+    graph.set_entry_point("analyze_request")
 
     # Clarification 조건부 라우팅
     graph.add_conditional_edges(
-        "extract_requirements",
+        "analyze_request",
         should_clarify,
         {
             "clarify": "clarify",
@@ -138,7 +135,9 @@ def build_orchestrator():
     # route_by_intent를 패스스루 노드로 추가
     graph.add_node("route_by_intent", route_by_intent_node)
 
-    return graph.compile()
+    # MemorySaver로 대화 히스토리 유지
+    memory = MemorySaver()
+    return graph.compile(checkpointer=memory)
 
 
 # 싱글톤 인스턴스

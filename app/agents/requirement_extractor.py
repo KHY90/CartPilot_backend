@@ -54,11 +54,15 @@ async def extract_requirements(state: AgentState) -> Dict[str, Any]:
     Returns:
         업데이트된 상태 딕셔너리
     """
-    raw_query = state["raw_query"]
+    # 누적된 모든 메시지에서 컨텍스트 추출
+    messages = state.get("messages", [])
+    all_user_texts = [msg.content for msg in messages if hasattr(msg, "content")]
+    full_context = " ".join(all_user_texts) if all_user_texts else state["raw_query"]
+
     intent = state.get("intent")
 
-    # 텍스트 파싱
-    budget, items, recipient = parse_user_input(raw_query)
+    # 전체 대화 컨텍스트로 파싱
+    budget, items, recipient = parse_user_input(full_context)
 
     # 기본 제약조건 (중고/렌탈/해외직구 제외)
     constraints = Constraints(
