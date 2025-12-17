@@ -2,16 +2,24 @@
 환경변수 설정 모듈
 Pydantic Settings를 사용하여 환경변수를 관리합니다.
 """
+
 from typing import Literal, List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
     """애플리케이션 설정"""
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
     # LLM 제공자 설정
-    llm_provider: Literal["openai", "gemini"] = "openai"
+    llm_provider: Literal["openai", "gemini"] = "gemini"
     openai_api_key: str = ""
     google_api_key: str = ""
 
@@ -37,11 +45,6 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """CORS origins를 리스트로 변환"""
         return [origin.strip() for origin in self.cors_origins.split(",")]
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
 
 
 @lru_cache()

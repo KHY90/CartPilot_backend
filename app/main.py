@@ -51,6 +51,11 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api", tags=["Health"])
     app.include_router(chat.router, prefix="/api", tags=["Chat"])
 
+    # Docker healthcheck용 루트 레벨 헬스체크
+    @app.get("/health")
+    async def root_health():
+        return {"status": "ok"}
+
     return app
 
 
