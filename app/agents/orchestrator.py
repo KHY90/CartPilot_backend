@@ -9,6 +9,10 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app.agents.analyzer import analyze_request
 from app.agents.gift_agent import gift_agent
+from app.agents.value_agent import value_agent
+from app.agents.bundle_agent import bundle_agent
+from app.agents.review_agent import review_agent
+from app.agents.trend_agent import trend_agent
 from app.agents.state import AgentState
 from app.models.request import IntentType
 
@@ -78,10 +82,10 @@ def create_orchestrator_graph() -> StateGraph:
 
     # 에이전트 노드
     graph.add_node("gift_agent", gift_agent)  # GIFT 모드
-    graph.add_node("value_agent", placeholder_agent)  # VALUE 모드 - Phase 4
-    graph.add_node("bundle_agent", placeholder_agent)  # BUNDLE 모드 - Phase 5
-    graph.add_node("review_agent", placeholder_agent)  # REVIEW 모드 - Phase 6
-    graph.add_node("trend_agent", placeholder_agent)  # TREND 모드 - Phase 7
+    graph.add_node("value_agent", value_agent)  # VALUE 모드
+    graph.add_node("bundle_agent", bundle_agent)  # BUNDLE 모드
+    graph.add_node("review_agent", review_agent)  # REVIEW 모드
+    graph.add_node("trend_agent", trend_agent)  # TREND 모드
 
     # 엣지 설정
     graph.set_entry_point("analyze_request")

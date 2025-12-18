@@ -287,11 +287,11 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
             budget_range=_build_budget_info(requirements),
         )
 
-        # 캐시 저장
-        await cache.set(cache_key, gift_recommendation.model_dump())
+        # 캐시 저장 (mode='json'으로 HttpUrl을 문자열로 변환)
+        await cache.set(cache_key, gift_recommendation.model_dump(mode='json'))
 
         return {
-            "recommendations": gift_recommendation.model_dump(),
+            "recommendations": gift_recommendation.model_dump(mode='json'),
             "cached": False,
             "processing_step": "gift_completed",
         }

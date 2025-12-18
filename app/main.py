@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, health
+from app.api import chat, graph, health
 from app.config import get_settings
 
 
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     # 라우터 등록
     app.include_router(health.router, prefix="/api", tags=["Health"])
     app.include_router(chat.router, prefix="/api", tags=["Chat"])
+    app.include_router(graph.router, prefix="/api", tags=["Graph"])
 
     # Docker healthcheck용 루트 레벨 헬스체크
     @app.get("/health")

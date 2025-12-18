@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
 
     # LLM 제공자 설정
-    llm_provider: Literal["openai", "gemini"] = "gemini"
+    llm_provider: Literal["openai", "gemini"] = "openai"
     openai_api_key: str = ""
     google_api_key: str = ""
 

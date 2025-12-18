@@ -46,6 +46,7 @@ class OpenAIProvider(LLMProvider):
         """ChatOpenAI 인스턴스 반환"""
         from langchain_openai import ChatOpenAI
 
+        # model = kwargs.get("model", "gemini-2.0-flash-lite")
         model = kwargs.get("model", "gpt-4o-mini")
         temperature = kwargs.get("temperature", 0.7)
 
@@ -82,7 +83,8 @@ class GeminiProvider(LLMProvider):
         """ChatGoogleGenerativeAI 인스턴스 반환"""
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        model = kwargs.get("model", "gemini-2.0-flash-lite")
+        # model = kwargs.get("model", "gemini-2.0-flash-lite")
+        model = kwargs.get("model", "gpt-4o-mini")
         temperature = kwargs.get("temperature", 0.7)
 
         return ChatGoogleGenerativeAI(
