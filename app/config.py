@@ -35,8 +35,14 @@ class Settings(BaseSettings):
 
     # 서버 설정
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    port: int = 8000  # Railway uses PORT env var
+    api_port: int = 8000  # fallback
     debug: bool = False
+
+    @property
+    def server_port(self) -> int:
+        """Railway PORT 환경변수 우선 사용"""
+        return self.port
 
     # CORS 설정
     cors_origins: str = "http://localhost:3000"
