@@ -5,14 +5,18 @@
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import get_orchestrator
 from app.models.request import IntentType
 from app.models.response import ChatResponse, ClarificationQuestion
 from app.services.session_store import get_session_store
+from app.services.jwt_service import verify_access_token
+from app.services.preference_analyzer import get_preference_analyzer
+from app.database import get_db
 
 router = APIRouter()
 
@@ -25,16 +29,22 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def send_chat_message(request: ChatRequest) -> ChatResponse:
+async def send_chat_message(
+    request: ChatRequest,
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> ChatResponse:
     """
     채팅 메시지 처리
 
     사용자 메시지를 받아 의도를 분류하고 적절한 추천을 반환합니다.
     - 8초 이내 응답 목표
     - 캐시 히트 시 1초 이내 응답
+    - 로그인 사용자의 경우 개인화 성향 적용
 
     Args:
         request: 채팅 요청 (메시지, 세션 ID)
+        authorization: JWT 토큰 (선택)
 
     Returns:
         ChatResponse: 추천 결과 또는 추가 질문
@@ -48,6 +58,24 @@ async def send_chat_message(request: ChatRequest) -> ChatResponse:
 
         # 사용자 메시지 세션에 추가
         session.add_user_message(request.message)
+
+        # 사용자 인증 및 성향 로드 (선택적)
+        user_id = None
+        user_preferences = None
+
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization[7:]
+            try:
+                payload = verify_access_token(token)
+                if payload and "user_id" in payload:
+                    user_id = payload["user_id"]
+                    # 성향 분석
+                    analyzer = get_preference_analyzer()
+                    prefs = await analyzer.analyze(db, user_id)
+                    user_preferences = prefs.to_prompt_context()
+            except Exception:
+                # 토큰 검증 실패해도 계속 진행 (비로그인 사용자로)
+                pass
 
         # 오케스트레이터 실행
         orchestrator = get_orchestrator()
@@ -72,6 +100,9 @@ async def send_chat_message(request: ChatRequest) -> ChatResponse:
             "messages": [HumanMessage(content=request.message)],
             "processing_step": "started",
             "cached": False,
+            # 개인화 (Phase 4)
+            "user_id": user_id,
+            "user_preferences": user_preferences,
         }
 
         # 그래프 실행 (config로 thread_id 전달)
