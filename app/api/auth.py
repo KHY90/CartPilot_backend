@@ -6,7 +6,7 @@
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,10 +29,9 @@ oauth_states: dict[str, str] = {}
 
 # ==================== Response Models ====================
 class TokenResponse(BaseModel):
-    """토큰 응답"""
+    """토큰 응답 (access_token만 반환, refresh_token은 쿠키로)"""
 
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     expires_in: int
 
@@ -50,10 +49,26 @@ class UserResponse(BaseModel):
     created_at: Optional[str]
 
 
-class RefreshTokenRequest(BaseModel):
-    """토큰 갱신 요청"""
+# ==================== Cookie Helper Functions ====================
+def set_refresh_token_cookie(response: Response, refresh_token: str) -> None:
+    """Refresh Token을 HTTP-only 쿠키로 설정"""
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=not settings.debug,  # 프로덕션에서만 HTTPS
+        samesite="lax",
+        max_age=7 * 24 * 60 * 60,  # 7일
+        path="/api/auth",
+    )
 
-    refresh_token: str
+
+def delete_refresh_token_cookie(response: Response) -> None:
+    """Refresh Token 쿠키 삭제"""
+    response.delete_cookie(
+        key="refresh_token",
+        path="/api/auth",
+    )
 
 
 # ==================== 카카오 로그인 ====================
@@ -68,11 +83,25 @@ async def kakao_login():
 
 @router.get("/kakao/callback")
 async def kakao_callback(
-    code: str = Query(...),
+    code: Optional[str] = Query(None),
     state: str = Query(...),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """카카오 로그인 콜백 처리"""
+    # 에러 응답 처리 (사용자가 로그인 취소하거나 권한 오류 등)
+    if error:
+        frontend_url = settings.cors_origins_list[0]
+        error_msg = error_description or error
+        return RedirectResponse(url=f"{frontend_url}/auth/callback?error={error_msg}")
+
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="인증 코드가 없습니다",
+        )
+
     # state 검증
     if state not in oauth_states or oauth_states[state] != "kakao":
         raise HTTPException(
@@ -102,14 +131,12 @@ async def kakao_callback(
         # JWT 토큰 발급
         tokens = create_tokens(str(user.id), user.provider)
 
-        # 프론트엔드로 리다이렉트 (토큰을 URL 파라미터로 전달)
+        # 프론트엔드로 리다이렉트 (access_token만 URL로, refresh_token은 쿠키로)
         frontend_url = settings.cors_origins_list[0]
-        redirect_url = (
-            f"{frontend_url}/auth/callback"
-            f"?access_token={tokens['access_token']}"
-            f"&refresh_token={tokens['refresh_token']}"
-        )
-        return RedirectResponse(url=redirect_url)
+        redirect_url = f"{frontend_url}/auth/callback?access_token={tokens['access_token']}"
+        response = RedirectResponse(url=redirect_url)
+        set_refresh_token_cookie(response, tokens["refresh_token"])
+        return response
 
     except Exception as e:
         raise HTTPException(
@@ -130,11 +157,25 @@ async def naver_login():
 
 @router.get("/naver/callback")
 async def naver_callback(
-    code: str = Query(...),
+    code: Optional[str] = Query(None),
     state: str = Query(...),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """네이버 로그인 콜백 처리"""
+    # 에러 응답 처리
+    if error:
+        frontend_url = settings.cors_origins_list[0]
+        error_msg = error_description or error
+        return RedirectResponse(url=f"{frontend_url}/auth/callback?error={error_msg}")
+
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="인증 코드가 없습니다",
+        )
+
     # state 검증
     if state not in oauth_states or oauth_states[state] != "naver":
         raise HTTPException(
@@ -156,14 +197,12 @@ async def naver_callback(
         # JWT 토큰 발급
         tokens = create_tokens(str(user.id), user.provider)
 
-        # 프론트엔드로 리다이렉트
+        # 프론트엔드로 리다이렉트 (access_token만 URL로, refresh_token은 쿠키로)
         frontend_url = settings.cors_origins_list[0]
-        redirect_url = (
-            f"{frontend_url}/auth/callback"
-            f"?access_token={tokens['access_token']}"
-            f"&refresh_token={tokens['refresh_token']}"
-        )
-        return RedirectResponse(url=redirect_url)
+        redirect_url = f"{frontend_url}/auth/callback?access_token={tokens['access_token']}"
+        response = RedirectResponse(url=redirect_url)
+        set_refresh_token_cookie(response, tokens["refresh_token"])
+        return response
 
     except Exception as e:
         raise HTTPException(
@@ -175,13 +214,23 @@ async def naver_callback(
 # ==================== 토큰 관리 ====================
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    request: RefreshTokenRequest,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """토큰 갱신"""
-    token_data = jwt_service.verify_token(request.refresh_token)
+    """토큰 갱신 (쿠키에서 refresh_token 읽기)"""
+    refresh_token_value = request.cookies.get("refresh_token")
+
+    if not refresh_token_value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="리프레시 토큰이 없습니다",
+        )
+
+    token_data = jwt_service.verify_token(refresh_token_value)
 
     if token_data is None:
+        delete_refresh_token_cookie(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="유효하지 않은 리프레시 토큰입니다",
@@ -192,6 +241,7 @@ async def refresh_token(
     user = result.scalar_one_or_none()
 
     if user is None or not user.is_active:
+        delete_refresh_token_cookie(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="사용자를 찾을 수 없습니다",
@@ -199,15 +249,21 @@ async def refresh_token(
 
     # 새 토큰 발급
     tokens = create_tokens(str(user.id), user.provider)
-    return TokenResponse(**tokens)
+
+    # 새 refresh_token 쿠키 설정
+    set_refresh_token_cookie(response, tokens["refresh_token"])
+
+    return TokenResponse(
+        access_token=tokens["access_token"],
+        token_type=tokens["token_type"],
+        expires_in=tokens["expires_in"],
+    )
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
-    """로그아웃 (클라이언트에서 토큰 삭제)"""
-    # JWT는 stateless이므로 서버에서 무효화할 수 없음
-    # 클라이언트에서 토큰을 삭제해야 함
-    # 추후 Redis에 블랙리스트 구현 가능
+async def logout(response: Response):
+    """로그아웃 (쿠키 삭제)"""
+    delete_refresh_token_cookie(response)
     return {"message": "로그아웃 되었습니다"}
 
 

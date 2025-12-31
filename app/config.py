@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     # ========== JWT 인증 설정 ==========
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440
+    jwt_expire_minutes: int = 15  # Access Token 15분
 
     # ========== OAuth 소셜 로그인 설정 ==========
     # 카카오

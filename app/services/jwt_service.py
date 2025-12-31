@@ -95,3 +95,17 @@ class JWTService:
 
 # 싱글톤 인스턴스
 jwt_service = JWTService()
+
+
+def verify_access_token(token: str) -> Optional[dict]:
+    """액세스 토큰 검증 (dict 반환)"""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("type") != "access":
+            return None
+        return {
+            "user_id": payload.get("sub"),
+            "provider": payload.get("provider"),
+        }
+    except JWTError:
+        return None

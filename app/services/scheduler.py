@@ -83,12 +83,12 @@ class SchedulerService:
             logger.info("가격 이력 정리 시작")
             from datetime import datetime, timedelta
             from sqlalchemy import delete
-            from app.database import async_session_maker
+            from app.database import async_session_factory
             from app.models.wishlist import PriceHistory
 
             cutoff_date = datetime.utcnow() - timedelta(days=180)
 
-            async with async_session_maker() as db:
+            async with async_session_factory() as db:
                 stmt = delete(PriceHistory).where(
                     PriceHistory.recorded_at < cutoff_date
                 )

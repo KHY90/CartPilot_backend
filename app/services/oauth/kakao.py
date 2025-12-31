@@ -31,8 +31,8 @@ class KakaoOAuthService(BaseOAuthService):
             "redirect_uri": settings.kakao_redirect_uri,
             "response_type": "code",
             "state": state,
-            # talk_message 스코프 추가: "나에게 보내기" 기능 사용
-            "scope": "profile_nickname profile_image account_email talk_message",
+            # 개인 개발자는 account_email 사용 불가 (사업자 등록 필요)
+            "scope": "profile_nickname profile_image",
         }
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 

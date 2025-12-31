@@ -11,7 +11,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import async_session_maker
+from app.database import async_session_factory
 from app.models.user import User
 from app.models.wishlist import WishlistItem, PriceHistory
 from app.services.naver_shopping import get_naver_client, NaverShoppingError
@@ -36,7 +36,7 @@ class PriceMonitorService:
         """
         results = {"checked": 0, "updated": 0, "alerts_sent": 0, "errors": 0}
 
-        async with async_session_maker() as db:
+        async with async_session_factory() as db:
             try:
                 # 알림이 활성화된 모든 관심상품 조회
                 stmt = (
