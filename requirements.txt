@@ -7,12 +7,12 @@ python-multipart>=0.0.6
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
-# LangGraph and LangChain
-langgraph>=0.0.40
-langchain>=0.1.0
-langchain-core>=0.1.0
-langchain-openai>=0.0.5
-langchain-google-genai>=0.0.6
+# LangGraph and LangChain (2025.12 Latest)
+langgraph>=1.0.5
+langchain>=1.2.0
+langchain-core>=1.2.5
+langchain-openai>=1.1.6
+langchain-google-genai>=4.1.2
 
 # HTTP client
 httpx>=0.26.0
