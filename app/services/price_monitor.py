@@ -103,8 +103,11 @@ class PriceMonitorService:
             # 가장 유사한 상품의 가격 사용 (첫 번째 결과)
             current_price = search_result.items[0].price
 
+            # 이전 가격 저장
+            previous_price = item.current_price
+
             # 가격이 변경된 경우에만 업데이트
-            if current_price != item.current_price:
+            if current_price != previous_price:
                 # 가격 이력 추가
                 price_history = PriceHistory(
                     wishlist_item_id=item.id,
@@ -121,8 +124,8 @@ class PriceMonitorService:
                 lowest_90 = await self._calculate_lowest_90days(db, item.id, current_price)
                 item.lowest_price_90days = lowest_90
 
-                # 최저가 알림 조건 확인
-                if self._should_send_alert(item, current_price, lowest_90):
+                # 알림 조건 확인 (새로운 조건 포함)
+                if self._should_send_alert(item, current_price, lowest_90, previous_price):
                     user = item.user
                     if user and user.is_active:
                         success = await self.notification_manager.send_price_alert(
@@ -169,21 +172,34 @@ class PriceMonitorService:
         item: WishlistItem,
         current_price: int,
         lowest_90days: int,
+        previous_price: int,
     ) -> bool:
         """
         알림 발송 조건 확인
 
-        조건:
-        1. 현재 가격이 90일 최저가와 같거나 낮음
-        2. 또는 목표 가격 이하로 떨어짐
+        조건 (각각 개별 설정 가능):
+        1. alert_on_lowest: 현재 가격이 90일 최저가와 같거나 낮음
+        2. alert_on_target: 목표 가격 이하로 떨어짐
+        3. alert_on_drop_percent: N% 이상 하락 시
         """
-        # 현재 가격이 90일 최저가 이하
-        if current_price <= lowest_90days:
+        # 조건 1: 90일 최저가 도달 (alert_on_lowest가 True일 때만)
+        if item.alert_on_lowest and current_price <= lowest_90days:
+            logger.info(f"알림 조건 충족 (90일 최저가): {item.product_name}")
             return True
 
-        # 목표 가격이 설정되어 있고, 현재 가격이 목표 이하
-        if item.target_price and current_price <= item.target_price:
+        # 조건 2: 목표가 도달 (alert_on_target이 True이고 목표가가 설정된 경우)
+        if item.alert_on_target and item.target_price and current_price <= item.target_price:
+            logger.info(f"알림 조건 충족 (목표가 도달): {item.product_name}")
             return True
+
+        # 조건 3: N% 이상 하락 (alert_on_drop_percent가 설정된 경우)
+        if item.alert_on_drop_percent and previous_price > 0:
+            drop_percent = ((previous_price - current_price) / previous_price) * 100
+            if drop_percent >= item.alert_on_drop_percent:
+                logger.info(
+                    f"알림 조건 충족 ({drop_percent:.1f}% 하락): {item.product_name}"
+                )
+                return True
 
         return False
 

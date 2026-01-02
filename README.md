@@ -5,8 +5,8 @@ LangGraph 기반 AI 쇼핑 어시스턴트 백엔드 서버
 ## 기술 스택
 
 - **Framework**: FastAPI
-- **AI/LLM**: LangGraph, LangChain, OpenAI/Gemini
-- **Language**: Python 3.11+
+- **AI/LLM**: LangGraph 1.0+, LangChain 1.2+, OpenAI/Gemini
+- **Language**: Python 3.10+
 - **Validation**: Pydantic v2
 
 ## 프로젝트 구조

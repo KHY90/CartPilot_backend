@@ -82,6 +82,21 @@ class WishlistItem(Base):
         default=True,
         comment="가격 알림 활성화",
     )
+    alert_on_lowest: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        comment="90일 최저가 도달 시 알림",
+    )
+    alert_on_target: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        comment="목표가 도달 시 알림",
+    )
+    alert_on_drop_percent: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="N% 이상 하락 시 알림 (예: 10 = 10% 하락 시)",
+    )
     last_notified_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime,
         nullable=True,
@@ -134,6 +149,9 @@ class WishlistItem(Base):
             "target_price": self.target_price,
             "lowest_price_90days": self.lowest_price_90days,
             "notification_enabled": self.notification_enabled,
+            "alert_on_lowest": self.alert_on_lowest,
+            "alert_on_target": self.alert_on_target,
+            "alert_on_drop_percent": self.alert_on_drop_percent,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
