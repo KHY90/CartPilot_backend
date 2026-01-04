@@ -23,10 +23,12 @@ GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
 
 예산: {budget_info}
 
+{user_preferences}
+
 상품 목록:
 {products}
 
-다음 형식으로 3~6개 상품을 추천하세요 (JSON만 출력):
+다음 형식으로 3~10개 상품을 추천하세요 (JSON만 출력):
 {{
   "recommendations": [
     {{
@@ -44,6 +46,7 @@ GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
 2. 예산 범위 내 상품 우선
 3. 해당 상황(occasion)에 적합한 상품
 4. 실용적이면서도 의미 있는 선물
+5. 사용자의 구매 성향과 선호도 반영 (해당되는 경우)
 """
 
 
@@ -229,9 +232,13 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         # 3. LLM으로 추천 생성
         llm_provider = get_llm_provider()
 
+        # 사용자 성향 컨텍스트 가져오기
+        user_prefs = state.get("user_preferences", "")
+
         prompt = GIFT_RECOMMENDATION_PROMPT.format(
             recipient_info=_build_recipient_info(requirements),
             budget_info=_build_budget_info(requirements),
+            user_preferences=user_prefs if user_prefs else "",
             products=_build_product_list(unique_products),
         )
 
@@ -256,7 +263,7 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         product_map = {p.product_id: p for p in unique_products}
         cards: List[RecommendationCard] = []
 
-        for rec in llm_result.get("recommendations", [])[:6]:
+        for rec in llm_result.get("recommendations", [])[:10]:
             product_id = rec.get("product_id")
             if product_id in product_map:
                 card = _create_recommendation_card(
@@ -281,7 +288,7 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
                         break
 
         gift_recommendation = GiftRecommendation(
-            cards=cards[:6],
+            cards=cards[:10],  # 최대 10개 (프론트에서 5개씩 표시)
             recipient_summary=llm_result.get("recipient_summary", _build_recipient_info(requirements)),
             occasion=llm_result.get("occasion"),
             budget_range=_build_budget_info(requirements),

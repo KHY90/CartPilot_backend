@@ -51,3 +51,7 @@ class AgentState(TypedDict):
     # 메타데이터
     processing_step: str
     cached: bool
+
+    # 개인화 (Phase 4)
+    user_id: Optional[str]  # 로그인한 사용자 ID
+    user_preferences: Optional[str]  # 성향 컨텍스트 문자열

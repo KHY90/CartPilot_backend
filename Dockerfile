@@ -41,4 +41,6 @@ ENV PORT=8000
 
 # Run the application
 # Railway injects PORT env var at runtime
-CMD uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
+# 1. Run Alembic migrations automatically before starting server
+# 2. Start uvicorn server
+CMD alembic upgrade head && uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT
