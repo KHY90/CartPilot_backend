@@ -53,15 +53,32 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     # ========== 데이터베이스 설정 ==========
+    # Railway DATABASE_URL 직접 사용 (우선)
+    database_url_raw: Optional[str] = None
+
+    # 개별 설정 (로컬 개발용)
     postgres_user: str = ""
     postgres_password: str = ""
     postgres_host: str = ""
     postgres_port: int = 5432
     postgres_db: str = ""
 
+    @field_validator("database_url_raw", mode="before")
+    @classmethod
+    def get_database_url_from_env(cls, v):
+        """DATABASE_URL 환경변수 읽기"""
+        import os
+        return v or os.environ.get("DATABASE_URL")
+
     @property
     def database_url(self) -> str:
         """PostgreSQL 비동기 연결 URL"""
+        if self.database_url_raw:
+            # Railway DATABASE_URL 사용 (postgresql:// -> postgresql+asyncpg://)
+            url = self.database_url_raw
+            if url.startswith("postgresql://"):
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -70,6 +87,12 @@ class Settings(BaseSettings):
     @property
     def database_url_sync(self) -> str:
         """PostgreSQL 동기 연결 URL (Alembic용)"""
+        if self.database_url_raw:
+            # Railway DATABASE_URL 그대로 사용
+            url = self.database_url_raw
+            if url.startswith("postgresql+asyncpg://"):
+                url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+            return url
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -102,6 +125,10 @@ class Settings(BaseSettings):
     smtp_from_email: Optional[str] = None
 
     # ========== Redis 설정 ==========
+    # Railway REDIS_URL 직접 사용 (우선)
+    redis_url_raw: Optional[str] = None
+
+    # 개별 설정 (로컬 개발용)
     redis_host: str = ""
     redis_port: int = 6379
     redis_db: int = 0
@@ -116,9 +143,18 @@ class Settings(BaseSettings):
             return defaults.get(info.field_name, v)
         return v
 
+    @field_validator("redis_url_raw", mode="before")
+    @classmethod
+    def get_redis_url_from_env(cls, v):
+        """REDIS_URL 환경변수 읽기"""
+        import os
+        return v or os.environ.get("REDIS_URL")
+
     @property
     def redis_url(self) -> str:
         """Redis 연결 URL"""
+        if self.redis_url_raw:
+            return self.redis_url_raw
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
