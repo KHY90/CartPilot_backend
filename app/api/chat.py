@@ -16,6 +16,7 @@ from app.models.response import ChatResponse, ClarificationQuestion
 from app.services.session_store import get_session_store
 from app.services.jwt_service import verify_access_token
 from app.services.preference_analyzer import get_preference_analyzer
+from app.services.cache import get_cache
 from app.database import get_db
 
 router = APIRouter()
@@ -26,6 +27,25 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=500, description="사용자 메시지")
     session_id: Optional[str] = Field(None, description="세션 ID (없으면 자동 생성)")
+
+
+class CachedProduct(BaseModel):
+    """캐시된 상품 정보"""
+
+    product_id: str
+    title: str
+    price: int
+    price_display: str
+    mall_name: str
+    link: str
+    image: Optional[str] = None
+
+
+class CachedSearchResults(BaseModel):
+    """캐시된 검색 결과"""
+
+    session_id: str
+    products: list[CachedProduct]
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -111,12 +131,34 @@ async def send_chat_message(
         # 처리 시간 계산
         processing_time_ms = int((time.time() - start_time) * 1000)
 
+        # 검색 결과가 있으면 캐시에 저장 (구매 기록 등록용)
+        search_results = result.get("search_results", [])
+        recommendations = result.get("recommendations")
+        if recommendations and hasattr(recommendations, "cards"):
+            # GiftRecommendation 등의 cards를 캐시에 저장
+            cache = get_cache()
+            cache_key = f"search_results:{session.session_id}"
+            cards_data = [
+                {
+                    "product_id": card.product_id,
+                    "title": card.title,
+                    "price": card.price,
+                    "price_display": card.price_display,
+                    "mall_name": card.mall_name,
+                    "link": card.link,
+                    "image": card.image,
+                }
+                for card in recommendations.cards
+            ]
+            await cache.set(cache_key, cards_data, ttl_seconds=3600)  # 1시간 TTL
+
         # 응답 생성
         if result.get("clarification_needed"):
             # 추가 질문 필요
             return ChatResponse(
                 type="clarification",
                 intent=result.get("intent"),
+                session_id=session.session_id,
                 clarification=ClarificationQuestion(
                     question=result.get("clarification_question", "추가 정보가 필요합니다."),
                     field=result.get("clarification_field", "unknown"),
@@ -131,6 +173,7 @@ async def send_chat_message(
             return ChatResponse(
                 type="error",
                 intent=result.get("intent"),
+                session_id=session.session_id,
                 error_message=result.get("error"),
                 fallback_suggestions=[
                     "다시 시도해 주세요",
@@ -145,6 +188,7 @@ async def send_chat_message(
             return ChatResponse(
                 type="recommendation",
                 intent=result.get("intent"),
+                session_id=session.session_id,
                 recommendations=result.get("recommendations"),
                 processing_time_ms=processing_time_ms,
                 cached=result.get("cached", False),
@@ -162,3 +206,47 @@ async def send_chat_message(
             processing_time_ms=processing_time_ms,
             cached=False,
         )
+
+
+@router.get("/search-results/{session_id}", response_model=CachedSearchResults)
+async def get_cached_search_results(
+    session_id: str,
+    authorization: Optional[str] = Header(None),
+) -> CachedSearchResults:
+    """
+    캐시된 검색 결과 조회
+
+    최근 검색 결과를 가져와서 구매 기록 등록에 사용할 수 있습니다.
+    캐시는 1시간 동안 유효합니다.
+
+    Args:
+        session_id: 세션 ID
+
+    Returns:
+        CachedSearchResults: 캐시된 상품 목록
+    """
+    # 인증 확인 (선택적)
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+        try:
+            verify_access_token(token)
+        except Exception:
+            pass  # 토큰 검증 실패해도 계속 진행
+
+    cache = get_cache()
+    cache_key = f"search_results:{session_id}"
+
+    cached_data = await cache.get(cache_key)
+
+    if cached_data is None:
+        raise HTTPException(
+            status_code=404,
+            detail="캐시된 검색 결과가 없거나 만료되었습니다."
+        )
+
+    products = [CachedProduct(**item) for item in cached_data]
+
+    return CachedSearchResults(
+        session_id=session_id,
+        products=products,
+    )

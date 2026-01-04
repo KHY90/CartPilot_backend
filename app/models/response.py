@@ -31,6 +31,7 @@ class ChatResponse(BaseModel):
         ..., description="응답 유형"
     )
     intent: Optional[IntentType] = Field(None, description="분류된 의도")
+    session_id: Optional[str] = Field(None, description="세션 ID (검색 결과 조회용)")
 
     # 추천 결과 (type=recommendation)
     recommendations: Optional[
