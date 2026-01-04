@@ -2,10 +2,13 @@
 채팅 엔드포인트
 사용자 메시지 처리 및 추천 응답 반환
 """
+import logging
 import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, Depends
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -151,6 +154,9 @@ async def send_chat_message(
                 for card in recommendations.cards
             ]
             await cache.set(cache_key, cards_data, ttl_seconds=3600)  # 1시간 TTL
+            logger.info(f"검색 결과 캐시 저장: {cache_key}, {len(cards_data)}개 상품")
+        else:
+            logger.debug(f"캐시 저장 스킵: recommendations={bool(recommendations)}, has_cards={hasattr(recommendations, 'cards') if recommendations else False}")
 
         # 응답 생성
         if result.get("clarification_needed"):
@@ -236,15 +242,18 @@ async def get_cached_search_results(
     cache = get_cache()
     cache_key = f"search_results:{session_id}"
 
+    logger.info(f"검색 결과 캐시 조회: {cache_key}")
     cached_data = await cache.get(cache_key)
 
     if cached_data is None:
+        logger.warning(f"검색 결과 캐시 없음: {cache_key}")
         raise HTTPException(
             status_code=404,
             detail="캐시된 검색 결과가 없거나 만료되었습니다."
         )
 
     products = [CachedProduct(**item) for item in cached_data]
+    logger.info(f"검색 결과 캐시 조회 성공: {cache_key}, {len(products)}개 상품")
 
     return CachedSearchResults(
         session_id=session_id,

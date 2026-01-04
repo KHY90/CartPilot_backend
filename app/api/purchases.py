@@ -3,6 +3,7 @@
 수동 입력 기반 구매 이력 관리
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -16,6 +17,8 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.models.purchase import PurchaseRecord
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -92,6 +95,8 @@ async def get_purchases(
     - offset: 시작 위치
     - category: 카테고리 필터
     """
+    logger.info(f"구매 기록 조회 - user_id: {current_user.id}")
+
     stmt = select(PurchaseRecord).where(PurchaseRecord.user_id == current_user.id)
 
     if category:
@@ -101,6 +106,8 @@ async def get_purchases(
 
     result = await db.execute(stmt)
     records = result.scalars().all()
+
+    logger.info(f"구매 기록 조회 완료 - {len(records)}개 발견")
 
     return [PurchaseResponse(**r.to_dict()) for r in records]
 
@@ -112,6 +119,13 @@ async def create_purchase(
     current_user: User = Depends(get_current_user),
 ):
     """구매 기록 생성"""
+    logger.info(f"구매 기록 생성 시작 - user_id: {current_user.id}, product: {data.product_name}")
+
+    # timezone-aware datetime을 timezone-naive로 변환
+    purchased_at = data.purchased_at
+    if purchased_at.tzinfo is not None:
+        purchased_at = purchased_at.replace(tzinfo=None)
+
     record = PurchaseRecord(
         user_id=current_user.id,
         product_name=data.product_name,
@@ -119,13 +133,28 @@ async def create_purchase(
         mall_name=data.mall_name,
         price=data.price,
         quantity=data.quantity,
-        purchased_at=data.purchased_at,
+        purchased_at=purchased_at,
         notes=data.notes,
     )
 
     db.add(record)
     await db.commit()
     await db.refresh(record)
+
+    logger.info(f"구매 기록 저장 완료 - id: {record.id}")
+
+    # 저장 확인: 방금 저장한 레코드를 다시 조회
+    verify_stmt = select(PurchaseRecord).where(
+        PurchaseRecord.id == record.id,
+        PurchaseRecord.user_id == current_user.id,
+    )
+    verify_result = await db.execute(verify_stmt)
+    verified_record = verify_result.scalar_one_or_none()
+
+    if verified_record:
+        logger.info(f"구매 기록 저장 확인됨 - id: {record.id}")
+    else:
+        logger.error(f"구매 기록 저장 확인 실패! - id: {record.id}")
 
     return PurchaseResponse(**record.to_dict())
 
@@ -170,6 +199,12 @@ async def update_purchase(
 
     # 업데이트
     update_data = data.model_dump(exclude_unset=True)
+
+    # timezone-aware datetime을 timezone-naive로 변환
+    if "purchased_at" in update_data and update_data["purchased_at"] is not None:
+        if update_data["purchased_at"].tzinfo is not None:
+            update_data["purchased_at"] = update_data["purchased_at"].replace(tzinfo=None)
+
     for key, value in update_data.items():
         setattr(record, key, value)
 

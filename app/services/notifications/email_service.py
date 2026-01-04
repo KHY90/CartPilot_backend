@@ -152,6 +152,98 @@ class EmailService:
         """
         return await self._send_email(to_email, subject, text_content, html_content)
 
+    async def send_welcome_notification(self, to_email: str) -> bool:
+        """
+        알림 설정 완료 환영 이메일 전송
+
+        Args:
+            to_email: 수신자 이메일
+
+        Returns:
+            전송 성공 여부
+        """
+        if not self.is_available():
+            logger.warning("이메일 서비스가 설정되지 않았습니다")
+            return False
+
+        subject = "🛒 CartPilot 알림 설정이 완료되었습니다!"
+
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }
+                .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+                .header h1 { margin: 0; font-size: 24px; }
+                .content { padding: 30px; }
+                .feature-list { background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; }
+                .feature-item { display: flex; align-items: center; margin: 12px 0; }
+                .feature-icon { font-size: 20px; margin-right: 12px; }
+                .feature-text { color: #333; }
+                .footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎉 알림 설정 완료!</h1>
+                </div>
+                <div class="content">
+                    <p>안녕하세요!</p>
+                    <p>CartPilot 이메일 알림 설정이 완료되었습니다.<br>
+                    이제 관심상품의 가격 변동 소식을 이메일로 받아보실 수 있습니다.</p>
+
+                    <div class="feature-list">
+                        <h3 style="margin-top: 0; color: #667eea;">알림을 받는 경우</h3>
+                        <div class="feature-item">
+                            <span class="feature-icon">📉</span>
+                            <span class="feature-text">90일 최저가에 도달했을 때</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🎯</span>
+                            <span class="feature-text">설정한 목표가에 도달했을 때</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">⬇️</span>
+                            <span class="feature-text">가격이 일정 비율 이상 하락했을 때</span>
+                        </div>
+                    </div>
+
+                    <p style="color: #666;">관심상품에서 각 상품의 알림을 켜두시면 자동으로 알림을 보내드립니다.</p>
+                </div>
+                <div class="footer">
+                    <p>이 메일은 CartPilot 가격 알림 서비스에서 발송되었습니다.</p>
+                    <p>© 2024 CartPilot. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_content = """
+        CartPilot 알림 설정 완료!
+
+        안녕하세요!
+
+        CartPilot 이메일 알림 설정이 완료되었습니다.
+        이제 관심상품의 가격 변동 소식을 이메일로 받아보실 수 있습니다.
+
+        알림을 받는 경우:
+        - 90일 최저가에 도달했을 때
+        - 설정한 목표가에 도달했을 때
+        - 가격이 일정 비율 이상 하락했을 때
+
+        관심상품에서 각 상품의 알림을 켜두시면 자동으로 알림을 보내드립니다.
+
+        감사합니다.
+        CartPilot 팀
+        """
+
+        return await self._send_email(to_email, subject, text_content, html_content)
+
     async def _send_email(
         self,
         to_email: str,

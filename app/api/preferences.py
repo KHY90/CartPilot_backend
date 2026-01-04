@@ -1,16 +1,21 @@
 """
 사용자 성향 API
-개인화를 위한 성향 분석 결과 조회
+개인화를 위한 성향 분석 결과 조회 + 알림 설정
 """
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+import logging
+from typing import Optional
+from fastapi import APIRouter, Depends, BackgroundTasks
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.preference_analyzer import get_preference_analyzer
+from app.services.notifications.email_service import get_email_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -96,4 +101,89 @@ async def get_prompt_context(
     return PersonalizedPromptResponse(
         context=prefs.to_prompt_context(),
         has_data=prefs.data_points > 0,
+    )
+
+
+# ========== 알림 설정 Schemas ==========
+
+
+class NotificationSettingsResponse(BaseModel):
+    """알림 설정 응답"""
+
+    email_notification_enabled: bool
+    notification_email: Optional[str]
+
+
+class NotificationSettingsUpdate(BaseModel):
+    """알림 설정 수정 요청"""
+
+    email_notification_enabled: Optional[bool] = None
+    notification_email: Optional[str] = None
+
+
+# ========== 알림 설정 Endpoints ==========
+
+
+@router.get("/notification-settings", response_model=NotificationSettingsResponse)
+async def get_notification_settings(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    알림 설정 조회
+
+    이메일 알림 활성화 여부와 알림 수신 이메일을 반환합니다.
+    """
+    return NotificationSettingsResponse(
+        email_notification_enabled=current_user.email_notification_enabled,
+        notification_email=current_user.notification_email,
+    )
+
+
+@router.put("/notification-settings", response_model=NotificationSettingsResponse)
+async def update_notification_settings(
+    request: NotificationSettingsUpdate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    알림 설정 수정
+
+    이메일 알림 활성화 여부와 알림 수신 이메일을 수정합니다.
+    새 이메일 설정 시 환영 이메일을 발송합니다.
+    """
+    # 이메일이 새로 설정되었는지 확인
+    old_email = current_user.notification_email
+    new_email = request.notification_email
+
+    if request.email_notification_enabled is not None:
+        current_user.email_notification_enabled = request.email_notification_enabled
+
+    if new_email is not None:
+        current_user.notification_email = new_email
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    # 새 이메일이 설정되고 알림이 활성화된 경우 환영 이메일 발송
+    if (
+        new_email
+        and new_email != old_email
+        and current_user.email_notification_enabled
+    ):
+        email_service = get_email_service()
+        if email_service.is_available():
+            # 백그라운드에서 이메일 발송 (응답 지연 방지)
+            async def send_welcome():
+                success = await email_service.send_welcome_notification(new_email)
+                if success:
+                    logger.info(f"환영 이메일 발송 성공: {new_email}")
+                else:
+                    logger.warning(f"환영 이메일 발송 실패: {new_email}")
+
+            background_tasks.add_task(send_welcome)
+
+    return NotificationSettingsResponse(
+        email_notification_enabled=current_user.email_notification_enabled,
+        notification_email=current_user.notification_email,
     )
