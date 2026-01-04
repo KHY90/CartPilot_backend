@@ -37,11 +37,20 @@ settings = get_settings()
 def get_database_url() -> str:
     """DATABASE_URL 환경변수 우선 사용, 없으면 settings 사용"""
     database_url = os.environ.get("DATABASE_URL")
+
+    # 디버깅: 환경변수 확인
+    print(f"[DEBUG] DATABASE_URL from env: {'SET (hidden)' if database_url else 'NOT SET'}")
+    print(f"[DEBUG] All env vars with DB/PG: {[k for k in os.environ.keys() if 'DB' in k.upper() or 'PG' in k.upper() or 'POSTGRES' in k.upper()]}")
+
     if database_url:
         # Railway DATABASE_URL은 postgresql:// 형식
         if database_url.startswith("postgresql+asyncpg://"):
             database_url = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        print(f"[DEBUG] Using DATABASE_URL from environment")
         return database_url
+
+    print(f"[DEBUG] Falling back to settings.database_url_sync")
+    print(f"[DEBUG] postgres_host: '{settings.postgres_host}'")
     return settings.database_url_sync
 
 
