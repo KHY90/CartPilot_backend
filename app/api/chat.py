@@ -137,26 +137,52 @@ async def send_chat_message(
         # 검색 결과가 있으면 캐시에 저장 (구매 기록 등록용)
         search_results = result.get("search_results", [])
         recommendations = result.get("recommendations")
-        if recommendations and hasattr(recommendations, "cards"):
-            # GiftRecommendation 등의 cards를 캐시에 저장
+        cards_data = []
+
+        if recommendations:
+            # GiftRecommendation 등의 cards 속성이 있는 경우
+            if hasattr(recommendations, "cards") and recommendations.cards:
+                cards_data = [
+                    {
+                        "product_id": card.product_id,
+                        "title": card.title,
+                        "price": card.price,
+                        "price_display": card.price_display,
+                        "mall_name": card.mall_name,
+                        "link": card.link,
+                        "image": card.image,
+                    }
+                    for card in recommendations.cards
+                ]
+            # ValueRecommendation의 tier별 cards
+            elif hasattr(recommendations, "budget_tier"):
+                all_cards = []
+                if hasattr(recommendations, "budget_tier") and recommendations.budget_tier:
+                    all_cards.extend(recommendations.budget_tier)
+                if hasattr(recommendations, "standard_tier") and recommendations.standard_tier:
+                    all_cards.extend(recommendations.standard_tier)
+                if hasattr(recommendations, "premium_tier") and recommendations.premium_tier:
+                    all_cards.extend(recommendations.premium_tier)
+                cards_data = [
+                    {
+                        "product_id": card.product_id,
+                        "title": card.title,
+                        "price": card.price,
+                        "price_display": card.price_display,
+                        "mall_name": card.mall_name,
+                        "link": card.link,
+                        "image": card.image,
+                    }
+                    for card in all_cards
+                ]
+
+        if cards_data:
             cache = get_cache()
             cache_key = f"search_results:{session.session_id}"
-            cards_data = [
-                {
-                    "product_id": card.product_id,
-                    "title": card.title,
-                    "price": card.price,
-                    "price_display": card.price_display,
-                    "mall_name": card.mall_name,
-                    "link": card.link,
-                    "image": card.image,
-                }
-                for card in recommendations.cards
-            ]
             await cache.set(cache_key, cards_data, ttl_seconds=3600)  # 1시간 TTL
             logger.info(f"검색 결과 캐시 저장: {cache_key}, {len(cards_data)}개 상품")
         else:
-            logger.debug(f"캐시 저장 스킵: recommendations={bool(recommendations)}, has_cards={hasattr(recommendations, 'cards') if recommendations else False}")
+            logger.debug(f"캐시 저장 스킵: recommendations={bool(recommendations)}")
 
         # 응답 생성
         if result.get("clarification_needed"):

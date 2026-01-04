@@ -78,6 +78,7 @@ class PurchaseStats(BaseModel):
 
 
 # ========== Endpoints ==========
+# 중요: 고정 경로(stats/summary, categories)를 동적 경로({purchase_id})보다 먼저 정의해야 함
 
 
 @router.get("/purchases", response_model=list[PurchaseResponse])
@@ -159,6 +160,87 @@ async def create_purchase(
     return PurchaseResponse(**record.to_dict())
 
 
+# ========== 고정 경로 (동적 경로보다 먼저 정의) ==========
+
+
+@router.get("/purchases/stats/summary", response_model=PurchaseStats)
+async def get_purchase_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """구매 통계 조회"""
+    # 전체 통계
+    stmt = select(
+        func.count(PurchaseRecord.id),
+        func.sum(PurchaseRecord.price * PurchaseRecord.quantity),
+        func.avg(PurchaseRecord.price),
+    ).where(PurchaseRecord.user_id == current_user.id)
+
+    result = await db.execute(stmt)
+    row = result.one()
+    total_purchases = row[0] or 0
+    total_spent = row[1] or 0
+    average_price = float(row[2] or 0)
+
+    # 카테고리별 통계
+    cat_stmt = select(
+        PurchaseRecord.category,
+        func.sum(PurchaseRecord.price * PurchaseRecord.quantity),
+    ).where(
+        PurchaseRecord.user_id == current_user.id,
+        PurchaseRecord.category.isnot(None),
+    ).group_by(PurchaseRecord.category)
+
+    cat_result = await db.execute(cat_stmt)
+    categories = {row[0]: row[1] for row in cat_result.all()}
+
+    # 월별 지출 - PostgreSQL to_char 사용
+    month_expr = func.to_char(PurchaseRecord.purchased_at, "YYYY-MM")
+    monthly_stmt = select(
+        month_expr.label("month"),
+        func.sum(PurchaseRecord.price * PurchaseRecord.quantity).label("total"),
+    ).where(PurchaseRecord.user_id == current_user.id).group_by(
+        month_expr
+    ).order_by(month_expr.desc()).limit(12)
+
+    monthly_result = await db.execute(monthly_stmt)
+    monthly_spending = {
+        row[0]: row[1] for row in monthly_result.all() if row[0]
+    }
+
+    return PurchaseStats(
+        total_purchases=total_purchases,
+        total_spent=total_spent,
+        average_price=average_price,
+        categories=categories,
+        monthly_spending=monthly_spending,
+    )
+
+
+@router.get("/purchases/categories", response_model=list[str])
+async def get_categories(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """사용자의 구매 카테고리 목록 조회"""
+    stmt = (
+        select(PurchaseRecord.category)
+        .where(
+            PurchaseRecord.user_id == current_user.id,
+            PurchaseRecord.category.isnot(None),
+        )
+        .distinct()
+    )
+
+    result = await db.execute(stmt)
+    categories = [row[0] for row in result.all()]
+
+    return categories
+
+
+# ========== 동적 경로 (고정 경로 후에 정의) ==========
+
+
 @router.get("/purchases/{purchase_id}", response_model=PurchaseResponse)
 async def get_purchase(
     purchase_id: UUID,
@@ -233,77 +315,3 @@ async def delete_purchase(
 
     await db.delete(record)
     await db.commit()
-
-
-@router.get("/purchases/stats/summary", response_model=PurchaseStats)
-async def get_purchase_stats(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """구매 통계 조회"""
-    # 전체 통계
-    stmt = select(
-        func.count(PurchaseRecord.id),
-        func.sum(PurchaseRecord.price * PurchaseRecord.quantity),
-        func.avg(PurchaseRecord.price),
-    ).where(PurchaseRecord.user_id == current_user.id)
-
-    result = await db.execute(stmt)
-    row = result.one()
-    total_purchases = row[0] or 0
-    total_spent = row[1] or 0
-    average_price = float(row[2] or 0)
-
-    # 카테고리별 통계
-    cat_stmt = select(
-        PurchaseRecord.category,
-        func.sum(PurchaseRecord.price * PurchaseRecord.quantity),
-    ).where(
-        PurchaseRecord.user_id == current_user.id,
-        PurchaseRecord.category.isnot(None),
-    ).group_by(PurchaseRecord.category)
-
-    cat_result = await db.execute(cat_stmt)
-    categories = {row[0]: row[1] for row in cat_result.all()}
-
-    # 월별 지출
-    monthly_stmt = select(
-        func.date_trunc("month", PurchaseRecord.purchased_at),
-        func.sum(PurchaseRecord.price * PurchaseRecord.quantity),
-    ).where(PurchaseRecord.user_id == current_user.id).group_by(
-        func.date_trunc("month", PurchaseRecord.purchased_at)
-    ).order_by(func.date_trunc("month", PurchaseRecord.purchased_at).desc()).limit(12)
-
-    monthly_result = await db.execute(monthly_stmt)
-    monthly_spending = {
-        row[0].strftime("%Y-%m"): row[1] for row in monthly_result.all() if row[0]
-    }
-
-    return PurchaseStats(
-        total_purchases=total_purchases,
-        total_spent=total_spent,
-        average_price=average_price,
-        categories=categories,
-        monthly_spending=monthly_spending,
-    )
-
-
-@router.get("/purchases/categories", response_model=list[str])
-async def get_categories(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """사용자의 구매 카테고리 목록 조회"""
-    stmt = (
-        select(PurchaseRecord.category)
-        .where(
-            PurchaseRecord.user_id == current_user.id,
-            PurchaseRecord.category.isnot(None),
-        )
-        .distinct()
-    )
-
-    result = await db.execute(stmt)
-    categories = [row[0] for row in result.all()]
-
-    return categories
