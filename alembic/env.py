@@ -2,6 +2,7 @@
 Alembic 환경 설정
 """
 
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -33,12 +34,23 @@ target_metadata = Base.metadata
 settings = get_settings()
 
 
+def get_database_url() -> str:
+    """DATABASE_URL 환경변수 우선 사용, 없으면 settings 사용"""
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        # Railway DATABASE_URL은 postgresql:// 형식
+        if database_url.startswith("postgresql+asyncpg://"):
+            database_url = database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return database_url
+    return settings.database_url_sync
+
+
 def run_migrations_offline() -> None:
     """
     오프라인 모드에서 마이그레이션 실행
     실제 DB 연결 없이 SQL 스크립트만 생성
     """
-    url = settings.database_url_sync
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -56,7 +68,7 @@ def run_migrations_online() -> None:
     실제 DB에 연결하여 마이그레이션 적용
     """
     connectable = create_engine(
-        settings.database_url_sync,
+        get_database_url(),
         poolclass=pool.NullPool,
     )
 
