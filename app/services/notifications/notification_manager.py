@@ -39,9 +39,8 @@ class NotificationManager:
         """
         가격 알림 전송
 
-        우선순위:
-        1. 카카오 알림톡 (사용자가 활성화한 경우)
-        2. 이메일 (fallback)
+        현재: 이메일로 직접 전송
+        (카카오톡 알림은 추후 활성화 예정)
 
         Args:
             db: 데이터베이스 세션
@@ -60,23 +59,23 @@ class NotificationManager:
 
         success = False
 
-        # 1. 카카오 "나에게 보내기" 시도
-        if user.kakao_notification_enabled and user.kakao_access_token:
-            try:
-                success = await self.kakao_message.send_price_alert(
-                    access_token=user.kakao_access_token,
-                    product_name=wishlist_item.product_name,
-                    current_price=current_price,
-                    lowest_price=lowest_price,
-                    product_link=wishlist_item.product_link or "",
-                )
-                if success:
-                    logger.info(f"카카오톡 메시지 전송 성공: {user.email} - {wishlist_item.product_name}")
-            except Exception as e:
-                logger.error(f"카카오톡 메시지 전송 실패: {e}")
+        # # 1. 카카오 "나에게 보내기" 시도 (현재 비활성화)
+        # if user.kakao_notification_enabled and user.kakao_access_token:
+        #     try:
+        #         success = await self.kakao_message.send_price_alert(
+        #             access_token=user.kakao_access_token,
+        #             product_name=wishlist_item.product_name,
+        #             current_price=current_price,
+        #             lowest_price=lowest_price,
+        #             product_link=wishlist_item.product_link or "",
+        #         )
+        #         if success:
+        #             logger.info(f"카카오톡 메시지 전송 성공: {user.email} - {wishlist_item.product_name}")
+        #     except Exception as e:
+        #         logger.error(f"카카오톡 메시지 전송 실패: {e}")
 
-        # 2. 이메일 fallback
-        if not success and user.email_notification_enabled:
+        # 이메일로 직접 전송
+        if user.email_notification_enabled:
             email = user.notification_email or user.email
             if email:
                 try:
