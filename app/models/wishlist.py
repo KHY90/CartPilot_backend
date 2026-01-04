@@ -79,7 +79,7 @@ class WishlistItem(Base):
     # 알림 설정
     notification_enabled: Mapped[bool] = mapped_column(
         Boolean,
-        default=True,
+        default=False,
         comment="가격 알림 활성화",
     )
     alert_on_lowest: Mapped[bool] = mapped_column(
