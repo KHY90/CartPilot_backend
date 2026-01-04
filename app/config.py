@@ -6,6 +6,7 @@ Pydantic Settings를 사용하여 환경변수를 관리합니다.
 
 from typing import Literal, List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -104,6 +105,16 @@ class Settings(BaseSettings):
     redis_host: str = ""
     redis_port: int = 6379
     redis_db: int = 0
+
+    # 빈 문자열을 기본값으로 변환하는 validator
+    @field_validator("postgres_port", "redis_port", "smtp_port", mode="before")
+    @classmethod
+    def empty_string_to_default(cls, v, info):
+        """빈 문자열이면 기본값 사용"""
+        if v == "" or v is None:
+            defaults = {"postgres_port": 5432, "redis_port": 6379, "smtp_port": 587}
+            return defaults.get(info.field_name, v)
+        return v
 
     @property
     def redis_url(self) -> str:
