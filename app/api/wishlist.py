@@ -175,6 +175,9 @@ async def add_to_wishlist(
     )
     db.add(item)
 
+    # flush하여 item.id를 먼저 할당받음
+    await db.flush()
+
     # 초기 가격 이력 추가
     price_history = PriceHistory(
         wishlist_item_id=item.id,
