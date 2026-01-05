@@ -13,6 +13,7 @@ from app.agents.value_agent import value_agent
 from app.agents.bundle_agent import bundle_agent
 from app.agents.review_agent import review_agent
 from app.agents.trend_agent import trend_agent
+from app.agents.validation_agent import validation_agent
 from app.agents.state import AgentState
 from app.models.request import IntentType
 
@@ -42,6 +43,15 @@ def route_by_intent(state: AgentState) -> str:
         return "value_agent"  # 기본값
 
 
+def should_retry_search(state: AgentState) -> Literal["retry", "end"]:
+    """검증 후 재검색 필요 여부 판단"""
+    validation_passed = state.get("validation_passed", True)
+
+    if validation_passed:
+        return "end"
+    return "retry"
+
+
 async def clarify_node(state: AgentState) -> Dict[str, Any]:
     """Clarification 노드 - 추가 질문 상태 설정"""
     return {
@@ -68,7 +78,10 @@ def create_orchestrator_graph() -> StateGraph:
        - clarify: 추가 질문 필요 → END
        - route_to_agent: 에이전트로 라우팅
     3. route_by_intent: 의도별 에이전트 실행
-    4. END
+    4. validation_agent: 상품 적합성 검증 (REVIEW 제외)
+       - 적합 상품 5개 이상: END
+       - 5개 미만: 재검색 (route_by_intent로 복귀, 최대 1회)
+    5. END
 
     Returns:
         컴파일된 StateGraph
@@ -86,6 +99,9 @@ def create_orchestrator_graph() -> StateGraph:
     graph.add_node("bundle_agent", bundle_agent)  # BUNDLE 모드
     graph.add_node("review_agent", review_agent)  # REVIEW 모드
     graph.add_node("trend_agent", trend_agent)  # TREND 모드
+
+    # 검증 에이전트 노드
+    graph.add_node("validation_agent", validation_agent)
 
     # 엣지 설정
     graph.set_entry_point("analyze_request")
@@ -116,12 +132,24 @@ def create_orchestrator_graph() -> StateGraph:
         },
     )
 
-    # 모든 에이전트는 END로
-    graph.add_edge("gift_agent", END)
-    graph.add_edge("value_agent", END)
-    graph.add_edge("bundle_agent", END)
+    # 추천 에이전트 → 검증 에이전트 (REVIEW 제외)
+    graph.add_edge("gift_agent", "validation_agent")
+    graph.add_edge("value_agent", "validation_agent")
+    graph.add_edge("bundle_agent", "validation_agent")
+    graph.add_edge("trend_agent", "validation_agent")
+
+    # REVIEW는 검증 없이 바로 END
     graph.add_edge("review_agent", END)
-    graph.add_edge("trend_agent", END)
+
+    # 검증 에이전트 → 조건부 라우팅 (재검색 또는 END)
+    graph.add_conditional_edges(
+        "validation_agent",
+        should_retry_search,
+        {
+            "retry": "route_by_intent",
+            "end": END,
+        },
+    )
 
     return graph
 

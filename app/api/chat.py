@@ -126,6 +126,11 @@ async def send_chat_message(
             # 개인화 (Phase 4)
             "user_id": user_id,
             "user_preferences": user_preferences,
+            # 검증 관련 (Validation Agent)
+            "validation_passed": True,
+            "retry_count": 0,
+            "validation_feedback": None,
+            "original_search_keywords": [],
         }
 
         # 그래프 실행 (config로 thread_id 전달)
@@ -222,6 +227,7 @@ async def send_chat_message(
                 intent=result.get("intent"),
                 session_id=session.session_id,
                 recommendations=result.get("recommendations"),
+                validation_feedback=result.get("validation_feedback"),
                 processing_time_ms=processing_time_ms,
                 cached=result.get("cached", False),
             )

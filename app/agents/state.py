@@ -55,3 +55,9 @@ class AgentState(TypedDict):
     # 개인화 (Phase 4)
     user_id: Optional[str]  # 로그인한 사용자 ID
     user_preferences: Optional[str]  # 성향 컨텍스트 문자열
+
+    # 검증 관련 (Validation Agent)
+    validation_passed: bool  # 검증 통과 여부
+    retry_count: int  # 재검색 횟수 (최대 1회)
+    validation_feedback: Optional[str]  # 검증 피드백 메시지 (사용자에게 표시)
+    original_search_keywords: List[str]  # 원본 검색 키워드 (재검색 비교용)
