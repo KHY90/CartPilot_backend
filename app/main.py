@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, graph, health, wishlist, ratings, purchases, admin, preferences
+from app.api import auth, chat, graph, health, wishlist, ratings, combination_ratings, purchases, admin, preferences
 from app.config import get_settings
 from app.database import init_db, close_db
 from app.services.scheduler import get_scheduler
@@ -75,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api", tags=["Auth"])
     app.include_router(wishlist.router, prefix="/api", tags=["Wishlist"])
     app.include_router(ratings.router, prefix="/api", tags=["Ratings"])
+    app.include_router(combination_ratings.router, prefix="/api", tags=["CombinationRatings"])
     app.include_router(purchases.router, prefix="/api", tags=["Purchases"])
     app.include_router(preferences.router, prefix="/api", tags=["Preferences"])
     app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])

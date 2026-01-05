@@ -15,6 +15,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.wishlist import WishlistItem
     from app.models.rating import ProductRating
+    from app.models.combination_rating import CombinationRating
 
 
 class User(Base):
@@ -117,6 +118,9 @@ class User(Base):
     )
     ratings: Mapped[list["ProductRating"]] = relationship(
         "ProductRating", back_populates="user", cascade="all, delete-orphan"
+    )
+    combination_ratings: Mapped[list["CombinationRating"]] = relationship(
+        "CombinationRating", back_populates="user", cascade="all, delete-orphan"
     )
 
     # 복합 유니크 제약 (provider + provider_id)
