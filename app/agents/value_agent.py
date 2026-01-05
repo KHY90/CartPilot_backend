@@ -150,21 +150,27 @@ async def value_agent(state: AgentState) -> Dict[str, Any]:
     requirements = state.get("requirements")
     session_id = state.get("session_id", "")
     search_keywords = state.get("search_keywords", [])
+    retry_count = state.get("retry_count", 0)
 
-    logger.info(f"[ValueAgent] 시작 - keywords: {search_keywords}")
+    logger.info(f"[ValueAgent] 시작 - keywords: {search_keywords}, retry: {retry_count}")
 
-    # 캐시 확인
+    # 캐시 확인 (재검색 시에는 캐시 스킵)
     cache = get_cache()
-    cache_key = cache.make_recommendation_key("VALUE", session_id, query=state.get("raw_query", ""))
+    # 캐시 키에 search_keywords 포함하여 재검색 시 다른 키 사용
+    keywords_key = ",".join(sorted(search_keywords[:3])) if search_keywords else ""
+    cache_key = cache.make_recommendation_key("VALUE", session_id, query=f"{state.get('raw_query', '')}:{keywords_key}")
 
-    cached_result = await cache.get(cache_key)
-    if cached_result:
-        logger.info("[ValueAgent] 캐시 히트")
-        return {
-            "recommendations": cached_result,
-            "cached": True,
-            "processing_step": "value_completed",
-        }
+    if retry_count == 0:
+        cached_result = await cache.get(cache_key)
+        if cached_result:
+            logger.info("[ValueAgent] 캐시 히트")
+            return {
+                "recommendations": cached_result,
+                "cached": True,
+                "processing_step": "value_completed",
+            }
+    else:
+        logger.info("[ValueAgent] 재검색 모드 - 캐시 스킵")
 
     try:
         # 1. 검색어 생성

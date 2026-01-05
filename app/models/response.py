@@ -51,6 +51,9 @@ class ChatResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="에러 메시지")
     fallback_suggestions: List[str] = Field(default_factory=list, description="대체 제안")
 
+    # 검증 피드백 (상품 검증 결과)
+    validation_feedback: Optional[str] = Field(None, description="상품 검증 피드백 메시지")
+
     # 메타
     processing_time_ms: int = Field(..., description="처리 시간 (밀리초)")
     cached: bool = Field(default=False, description="캐시 히트 여부")
