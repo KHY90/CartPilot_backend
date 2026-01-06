@@ -104,6 +104,134 @@ async def get_prompt_context(
     )
 
 
+# ========== 당신의 취향 Schemas ==========
+
+
+class TasteInsight(BaseModel):
+    """개별 취향 인사이트"""
+
+    icon: str
+    label: str
+    value: str
+    description: str | None = None
+
+
+class YourTasteResponse(BaseModel):
+    """당신의 취향 응답"""
+
+    has_data: bool
+    insights: list[TasteInsight]
+    summary: str
+    data_points: int
+    last_updated: str | None
+
+
+@router.get("/preferences/your-taste", response_model=YourTasteResponse)
+async def get_your_taste(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    "당신의 취향" 인사이트 조회
+
+    사용자 친화적인 취향 분석 결과를 반환합니다.
+    프론트엔드의 개인화 섹션 표시용입니다.
+    """
+    analyzer = get_preference_analyzer()
+    prefs = await analyzer.analyze(db, str(current_user.id))
+
+    if prefs.data_points == 0:
+        return YourTasteResponse(
+            has_data=False,
+            insights=[],
+            summary="구매 기록이나 별점 데이터가 아직 없어요. 상품을 탐색하고 평가해 보세요!",
+            data_points=0,
+            last_updated=None,
+        )
+
+    insights: list[TasteInsight] = []
+
+    # 가격대 인사이트
+    if prefs.avg_purchase_price:
+        price_label = (
+            "저가 선호" if prefs.price_sensitivity == "high"
+            else "프리미엄 선호" if prefs.price_sensitivity == "low"
+            else "균형 잡힌 소비"
+        )
+        insights.append(
+            TasteInsight(
+                icon="💰",
+                label="가격 성향",
+                value=price_label,
+                description=f"평균 {int(prefs.avg_purchase_price):,}원대 구매"
+            )
+        )
+
+    # 카테고리 인사이트
+    if prefs.preferred_categories:
+        top_cat = prefs.preferred_categories[0]
+        insights.append(
+            TasteInsight(
+                icon="🏷️",
+                label="관심 카테고리",
+                value=top_cat,
+                description=f"외 {len(prefs.preferred_categories) - 1}개 카테고리" if len(prefs.preferred_categories) > 1 else None
+            )
+        )
+
+    # 구매 빈도 인사이트
+    freq_labels = {"high": "활발한 쇼핑러", "medium": "신중한 구매자", "low": "선택적 소비자"}
+    insights.append(
+        TasteInsight(
+            icon="🛒",
+            label="구매 패턴",
+            value=freq_labels.get(prefs.purchase_frequency, "보통"),
+            description=None
+        )
+    )
+
+    # 선호 쇼핑몰 인사이트
+    if prefs.preferred_malls:
+        insights.append(
+            TasteInsight(
+                icon="🏪",
+                label="선호 쇼핑몰",
+                value=prefs.preferred_malls[0],
+                description=f"외 {len(prefs.preferred_malls) - 1}곳" if len(prefs.preferred_malls) > 1 else None
+            )
+        )
+
+    # 높게 평가한 키워드
+    if prefs.high_rated_keywords:
+        insights.append(
+            TasteInsight(
+                icon="⭐",
+                label="높게 평가한 유형",
+                value=", ".join(prefs.high_rated_keywords[:3]),
+                description=None
+            )
+        )
+
+    # 요약 생성
+    summary_parts = []
+    if prefs.preferred_categories:
+        summary_parts.append(f"{prefs.preferred_categories[0]}을(를) 좋아하시는군요")
+    if prefs.price_sensitivity == "high":
+        summary_parts.append("가성비를 중시하시네요")
+    elif prefs.price_sensitivity == "low":
+        summary_parts.append("품질을 중시하시네요")
+
+    summary = "! ".join(summary_parts) + "!" if summary_parts else "취향 분석 완료!"
+
+    return YourTasteResponse(
+        has_data=True,
+        insights=insights,
+        summary=summary,
+        data_points=prefs.data_points,
+        last_updated=prefs.analyzed_at.isoformat() if prefs.analyzed_at else None,
+    )
+
+
 # ========== 알림 설정 Schemas ==========
 
 

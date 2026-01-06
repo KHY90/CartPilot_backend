@@ -16,6 +16,9 @@ from app.models.user import User
 from app.models.wishlist import WishlistItem, PriceHistory
 from app.dependencies.auth import get_current_user
 from app.services.naver_shopping import get_naver_client, NaverShoppingError
+from app.services.price_predictor import get_price_predictor
+from app.models.price_prediction import PricePrediction, PredictionSummary
+from app.services.notifications.email_service import get_email_service
 
 router = APIRouter(prefix="/wishlist", tags=["관심상품"])
 
@@ -530,3 +533,186 @@ async def check_price_now(
         is_lowest=is_lowest,
         lowest_90days=item.lowest_price_90days,
     )
+
+
+@router.get("/{item_id}/prediction", response_model=PricePrediction)
+async def get_price_prediction(
+    item_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    가격 예측 조회
+    - 추세 분석 (상승/하락/안정)
+    - 다가오는 세일 정보
+    - 구매 추천 (지금 구매 / 대기 / 중립)
+    """
+    # 소유권 확인
+    result = await db.execute(
+        select(WishlistItem).where(
+            and_(
+                WishlistItem.id == item_id,
+                WishlistItem.user_id == current_user.id,
+            )
+        )
+    )
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="관심상품을 찾을 수 없습니다",
+        )
+
+    # 90일 가격 이력 조회
+    since = datetime.utcnow() - timedelta(days=90)
+    history_result = await db.execute(
+        select(PriceHistory)
+        .where(
+            and_(
+                PriceHistory.wishlist_item_id == item_id,
+                PriceHistory.recorded_at >= since,
+            )
+        )
+        .order_by(PriceHistory.recorded_at.desc())
+    )
+    history = history_result.scalars().all()
+
+    # 가격 이력을 (datetime, price) 튜플 리스트로 변환
+    price_history = [(h.recorded_at, h.price) for h in history]
+
+    # 예측 수행
+    predictor = get_price_predictor()
+    prediction = predictor.predict(
+        product_id=item.product_id,
+        current_price=item.current_price,
+        price_history=price_history,
+        category=item.category,
+    )
+
+    return prediction
+
+
+@router.get("/predictions/summary", response_model=PredictionSummary)
+async def get_predictions_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    모든 관심상품의 예측 요약
+    - 지금 구매 추천 수
+    - 대기 추천 수
+    - 다가오는 세일 정보
+    - 예상 절약 금액
+    """
+    # 사용자의 모든 관심상품 조회
+    result = await db.execute(
+        select(WishlistItem)
+        .where(WishlistItem.user_id == current_user.id)
+    )
+    items = result.scalars().all()
+
+    if not items:
+        return PredictionSummary(
+            total_products=0,
+            buy_now_count=0,
+            wait_count=0,
+            neutral_count=0,
+            next_sale=None,
+            potential_savings=0,
+        )
+
+    predictor = get_price_predictor()
+    predictions = []
+
+    for item in items:
+        # 각 상품의 가격 이력 조회
+        since = datetime.utcnow() - timedelta(days=90)
+        history_result = await db.execute(
+            select(PriceHistory)
+            .where(
+                and_(
+                    PriceHistory.wishlist_item_id == item.id,
+                    PriceHistory.recorded_at >= since,
+                )
+            )
+            .order_by(PriceHistory.recorded_at.desc())
+        )
+        history = history_result.scalars().all()
+        price_history = [(h.recorded_at, h.price) for h in history]
+
+        prediction = predictor.predict(
+            product_id=item.product_id,
+            current_price=item.current_price,
+            price_history=price_history,
+            category=item.category,
+        )
+        predictions.append(prediction)
+
+    return predictor.get_summary(predictions)
+
+
+class TestEmailRequest(BaseModel):
+    """테스트 이메일 요청"""
+
+    email: str
+
+
+class TestEmailResponse(BaseModel):
+    """테스트 이메일 응답"""
+
+    success: bool
+    message: str
+
+
+@router.post("/notifications/test-email", response_model=TestEmailResponse)
+async def send_test_email(
+    request: TestEmailRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    테스트 이메일 발송
+    - 이메일 설정 확인용
+    """
+    email_service = get_email_service()
+
+    if not email_service.is_available():
+        return TestEmailResponse(
+            success=False,
+            message="이메일 서비스가 설정되지 않았습니다. 관리자에게 문의하세요.",
+        )
+
+    try:
+        success = await email_service.send_welcome_notification(request.email)
+
+        if success:
+            return TestEmailResponse(
+                success=True,
+                message=f"{request.email}로 테스트 이메일을 발송했습니다.",
+            )
+        else:
+            return TestEmailResponse(
+                success=False,
+                message="이메일 발송에 실패했습니다. 이메일 주소를 확인해주세요.",
+            )
+    except Exception as e:
+        return TestEmailResponse(
+            success=False,
+            message=f"이메일 발송 중 오류가 발생했습니다: {str(e)}",
+        )
+
+
+@router.get("/notifications/status")
+async def get_notification_status(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    알림 서비스 상태 확인
+    """
+    email_service = get_email_service()
+
+    return {
+        "email_available": email_service.is_available(),
+        "user_email_enabled": current_user.email_notification_enabled,
+        "user_notification_email": current_user.notification_email or current_user.email,
+    }

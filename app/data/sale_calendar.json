@@ -1,0 +1,163 @@
+{
+  "annual_sales": [
+    {
+      "name": "설날 세일",
+      "start_month": 1,
+      "start_day": 15,
+      "end_month": 2,
+      "end_day": 10,
+      "discount_rate": 15,
+      "categories": ["전자제품", "가전", "의류", "식품", "생활용품"]
+    },
+    {
+      "name": "발렌타인데이",
+      "start_month": 2,
+      "start_day": 1,
+      "end_month": 2,
+      "end_day": 14,
+      "discount_rate": 10,
+      "categories": ["패션잡화", "화장품", "악세서리", "선물용품"]
+    },
+    {
+      "name": "화이트데이",
+      "start_month": 3,
+      "start_day": 1,
+      "end_month": 3,
+      "end_day": 14,
+      "discount_rate": 10,
+      "categories": ["패션잡화", "화장품", "악세서리", "선물용품"]
+    },
+    {
+      "name": "봄 시즌 세일",
+      "start_month": 3,
+      "start_day": 15,
+      "end_month": 4,
+      "end_day": 15,
+      "discount_rate": 20,
+      "categories": ["의류", "패션잡화", "스포츠용품"]
+    },
+    {
+      "name": "어린이날 세일",
+      "start_month": 4,
+      "start_day": 25,
+      "end_month": 5,
+      "end_day": 5,
+      "discount_rate": 15,
+      "categories": ["완구", "유아용품", "아동의류", "교육용품"]
+    },
+    {
+      "name": "어버이날 세일",
+      "start_month": 5,
+      "start_day": 1,
+      "end_month": 5,
+      "end_day": 8,
+      "discount_rate": 10,
+      "categories": ["건강식품", "효도선물", "가전"]
+    },
+    {
+      "name": "여름 시즌 세일",
+      "start_month": 6,
+      "start_day": 15,
+      "end_month": 7,
+      "end_day": 31,
+      "discount_rate": 25,
+      "categories": ["에어컨", "선풍기", "여름의류", "냉방가전"]
+    },
+    {
+      "name": "추석 세일",
+      "start_month": 8,
+      "start_day": 20,
+      "end_month": 9,
+      "end_day": 30,
+      "discount_rate": 20,
+      "categories": ["전자제품", "가전", "식품", "선물세트"]
+    },
+    {
+      "name": "가을 시즌 세일",
+      "start_month": 10,
+      "start_day": 1,
+      "end_month": 10,
+      "end_day": 31,
+      "discount_rate": 15,
+      "categories": ["의류", "패션잡화", "난방가전"]
+    },
+    {
+      "name": "11월 쇼핑 대전",
+      "start_month": 11,
+      "start_day": 1,
+      "end_month": 11,
+      "end_day": 11,
+      "discount_rate": 30,
+      "categories": ["전체"]
+    },
+    {
+      "name": "블랙프라이데이",
+      "start_month": 11,
+      "start_day": 20,
+      "end_month": 11,
+      "end_day": 30,
+      "discount_rate": 35,
+      "categories": ["전자제품", "가전", "패션", "뷰티"]
+    },
+    {
+      "name": "연말 세일",
+      "start_month": 12,
+      "start_day": 1,
+      "end_month": 12,
+      "end_day": 25,
+      "discount_rate": 25,
+      "categories": ["전체"]
+    },
+    {
+      "name": "크리스마스 세일",
+      "start_month": 12,
+      "start_day": 15,
+      "end_month": 12,
+      "end_day": 25,
+      "discount_rate": 20,
+      "categories": ["선물용품", "장난감", "전자기기", "패션"]
+    },
+    {
+      "name": "연말정산 세일",
+      "start_month": 12,
+      "start_day": 26,
+      "end_month": 12,
+      "end_day": 31,
+      "discount_rate": 30,
+      "categories": ["전체"]
+    }
+  ],
+  "special_days": [
+    {
+      "name": "신학기 시즌",
+      "month": 2,
+      "day_range": [15, 28],
+      "discount_rate": 15,
+      "categories": ["학용품", "노트북", "태블릿", "의류"]
+    },
+    {
+      "name": "빼빼로데이",
+      "month": 11,
+      "day_range": [8, 11],
+      "discount_rate": 10,
+      "categories": ["과자", "선물용품"]
+    }
+  ],
+  "category_seasonality": {
+    "에어컨": {"peak_months": [5, 6, 7], "low_months": [11, 12, 1, 2]},
+    "난방기": {"peak_months": [10, 11, 12], "low_months": [5, 6, 7, 8]},
+    "선풍기": {"peak_months": [5, 6, 7, 8], "low_months": [10, 11, 12, 1]},
+    "가습기": {"peak_months": [10, 11, 12, 1], "low_months": [5, 6, 7, 8]},
+    "제습기": {"peak_months": [6, 7, 8], "low_months": [11, 12, 1, 2]},
+    "겨울의류": {"peak_months": [10, 11, 12], "low_months": [4, 5, 6, 7]},
+    "여름의류": {"peak_months": [5, 6, 7], "low_months": [10, 11, 12, 1]},
+    "캠핑용품": {"peak_months": [4, 5, 9, 10], "low_months": [12, 1, 2]},
+    "스키용품": {"peak_months": [11, 12, 1, 2], "low_months": [5, 6, 7, 8]}
+  },
+  "price_trend_factors": {
+    "new_release_premium": 0.15,
+    "aging_discount_per_month": 0.02,
+    "competition_discount": 0.05,
+    "holiday_premium": 0.08
+  }
+}

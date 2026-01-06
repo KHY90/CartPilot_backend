@@ -2,16 +2,20 @@
 네이버 쇼핑 API 클라이언트
 상품 검색 및 필터링 기능 제공
 """
+import asyncio
 import html
+import logging
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.models.product import ProductCandidate, ProductSearchResult
+
+logger = logging.getLogger(__name__)
 
 
 class NaverShoppingError(Exception):
@@ -170,6 +174,154 @@ class NaverShoppingClient:
             total=data.get("total", 0),
             items=items,
             query=query,
+            sort=sort,
+            cached=False,
+        )
+
+    async def search_with_fallback(
+        self,
+        queries: List[str],
+        display: int = 20,
+        sort: str = "sim",
+        exclude_used: bool = True,
+        exclude_rental: bool = True,
+        min_price: Optional[int] = None,
+        max_price: Optional[int] = None,
+        min_results: int = 5,
+    ) -> ProductSearchResult:
+        """
+        다중 키워드 검색 및 결과 병합
+
+        Args:
+            queries: 검색어 리스트 (우선순위 순)
+            display: 최종 결과 개수
+            sort: 정렬 방식
+            exclude_used: 중고 제외
+            exclude_rental: 렌탈 제외
+            min_price: 최소 가격
+            max_price: 최대 가격
+            min_results: 최소 결과 개수 (이 이하면 다음 키워드로 검색)
+
+        Returns:
+            ProductSearchResult (병합된 결과)
+        """
+        all_items: List[ProductCandidate] = []
+        seen_ids: Set[str] = set()
+        used_queries: List[str] = []
+
+        for query in queries:
+            if len(all_items) >= display:
+                break
+
+            try:
+                result = await self.search(
+                    query=query,
+                    display=display - len(all_items),
+                    sort=sort,
+                    exclude_used=exclude_used,
+                    exclude_rental=exclude_rental,
+                    min_price=min_price,
+                    max_price=max_price,
+                )
+
+                # 중복 제거하며 추가
+                for item in result.items:
+                    if item.product_id not in seen_ids:
+                        seen_ids.add(item.product_id)
+                        all_items.append(item)
+
+                used_queries.append(query)
+                logger.info(
+                    f"검색 '{query}': {len(result.items)}개 결과, 총 {len(all_items)}개"
+                )
+
+                # 충분한 결과가 있으면 중단
+                if len(all_items) >= min_results:
+                    break
+
+            except NaverShoppingError as e:
+                logger.warning(f"검색 실패 '{query}': {e}")
+                continue
+            except Exception as e:
+                logger.error(f"예상치 못한 오류 '{query}': {e}")
+                continue
+
+        return ProductSearchResult(
+            total=len(all_items),
+            items=all_items[:display],
+            query=", ".join(used_queries) if used_queries else queries[0],
+            sort=sort,
+            cached=False,
+        )
+
+    async def search_multiple(
+        self,
+        queries: List[str],
+        display_per_query: int = 10,
+        max_total: int = 30,
+        sort: str = "sim",
+        exclude_used: bool = True,
+        exclude_rental: bool = True,
+        min_price: Optional[int] = None,
+        max_price: Optional[int] = None,
+    ) -> ProductSearchResult:
+        """
+        여러 키워드 병렬 검색 및 결과 병합
+
+        Args:
+            queries: 검색어 리스트
+            display_per_query: 키워드당 결과 개수
+            max_total: 최대 총 결과 개수
+            sort: 정렬 방식
+            exclude_used: 중고 제외
+            exclude_rental: 렌탈 제외
+            min_price: 최소 가격
+            max_price: 최대 가격
+
+        Returns:
+            ProductSearchResult (병합된 결과)
+        """
+        # 병렬 검색 태스크 생성
+        tasks = [
+            self.search(
+                query=query,
+                display=display_per_query,
+                sort=sort,
+                exclude_used=exclude_used,
+                exclude_rental=exclude_rental,
+                min_price=min_price,
+                max_price=max_price,
+            )
+            for query in queries[:5]  # 최대 5개 키워드
+        ]
+
+        # 병렬 실행
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 결과 병합 및 중복 제거
+        all_items: List[ProductCandidate] = []
+        seen_ids: Set[str] = set()
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning(f"검색 실패: {result}")
+                continue
+
+            for item in result.items:
+                if item.product_id not in seen_ids:
+                    seen_ids.add(item.product_id)
+                    all_items.append(item)
+
+        # 가격순 또는 관련도순 정렬
+        if sort == "asc":
+            all_items.sort(key=lambda x: x.price)
+        elif sort == "dsc":
+            all_items.sort(key=lambda x: x.price, reverse=True)
+
+        return ProductSearchResult(
+            total=len(all_items),
+            items=all_items[:max_total],
+            query=", ".join(queries),
             sort=sort,
             cached=False,
         )

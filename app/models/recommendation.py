@@ -76,9 +76,20 @@ class BundleCombination(BaseModel):
 class BundleRecommendation(BaseModel):
     """BUNDLE 모드 추천 결과"""
 
-    combinations: List[BundleCombination] = Field(..., min_length=2, max_length=3)
+    combinations: List[BundleCombination] = Field(..., min_length=1, max_length=3)
     total_budget: int = Field(..., description="사용자 총 예산")
     items_count: int = Field(..., description="품목 수")
+
+    # 동적 조합 관련 필드
+    compatibility_warnings: List[str] = Field(
+        default_factory=list, description="호환성 경고 메시지"
+    )
+    suggested_items: List[str] = Field(
+        default_factory=list, description="추천 추가 품목"
+    )
+    detected_group: Optional[str] = Field(
+        None, description="감지된 호환 그룹 (예: 컴퓨터_셋업)"
+    )
 
 
 class ReviewComplaint(BaseModel):
