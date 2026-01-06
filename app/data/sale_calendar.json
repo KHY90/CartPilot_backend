@@ -1,88 +1,116 @@
 {
+  "lunar_holidays": {
+    "설날": {
+      "2024": {"start": "02-09", "end": "02-12"},
+      "2025": {"start": "01-28", "end": "01-30"},
+      "2026": {"start": "02-16", "end": "02-18"},
+      "2027": {"start": "02-05", "end": "02-08"},
+      "2028": {"start": "01-25", "end": "01-27"},
+      "2029": {"start": "02-12", "end": "02-14"},
+      "2030": {"start": "02-02", "end": "02-04"}
+    },
+    "추석": {
+      "2024": {"start": "09-16", "end": "09-18"},
+      "2025": {"start": "10-05", "end": "10-07"},
+      "2026": {"start": "09-24", "end": "09-26"},
+      "2027": {"start": "09-14", "end": "09-16"},
+      "2028": {"start": "10-02", "end": "10-04"},
+      "2029": {"start": "09-21", "end": "09-23"},
+      "2030": {"start": "09-11", "end": "09-13"}
+    }
+  },
   "annual_sales": [
     {
       "name": "설날 세일",
-      "start_month": 1,
-      "start_day": 15,
-      "end_month": 2,
-      "end_day": 10,
-      "discount_rate": 15,
-      "categories": ["전자제품", "가전", "의류", "식품", "생활용품"]
+      "type": "lunar",
+      "lunar_holiday": "설날",
+      "days_before": 14,
+      "days_after": 0,
+      "discount_rate": 20,
+      "categories": ["전체"]
+    },
+    {
+      "name": "추석 세일",
+      "type": "lunar",
+      "lunar_holiday": "추석",
+      "days_before": 14,
+      "days_after": 0,
+      "discount_rate": 20,
+      "categories": ["전체"]
     },
     {
       "name": "발렌타인데이",
+      "type": "fixed",
       "start_month": 2,
-      "start_day": 1,
+      "start_day": 7,
       "end_month": 2,
       "end_day": 14,
-      "discount_rate": 10,
-      "categories": ["패션잡화", "화장품", "악세서리", "선물용품"]
+      "discount_rate": 15,
+      "categories": ["패션", "뷰티", "선물용품", "초콜릿", "악세서리"]
     },
     {
       "name": "화이트데이",
+      "type": "fixed",
       "start_month": 3,
-      "start_day": 1,
+      "start_day": 7,
       "end_month": 3,
       "end_day": 14,
-      "discount_rate": 10,
-      "categories": ["패션잡화", "화장품", "악세서리", "선물용품"]
+      "discount_rate": 15,
+      "categories": ["패션", "뷰티", "선물용품", "사탕", "악세서리"]
     },
     {
       "name": "봄 시즌 세일",
+      "type": "fixed",
       "start_month": 3,
       "start_day": 15,
       "end_month": 4,
       "end_day": 15,
       "discount_rate": 20,
-      "categories": ["의류", "패션잡화", "스포츠용품"]
+      "categories": ["의류", "패션", "스포츠"]
     },
     {
       "name": "어린이날 세일",
+      "type": "fixed",
       "start_month": 4,
-      "start_day": 25,
+      "start_day": 28,
       "end_month": 5,
       "end_day": 5,
-      "discount_rate": 15,
-      "categories": ["완구", "유아용품", "아동의류", "교육용품"]
+      "discount_rate": 20,
+      "categories": ["완구", "유아용품", "아동의류", "교육", "게임"]
     },
     {
       "name": "어버이날 세일",
+      "type": "fixed",
       "start_month": 5,
       "start_day": 1,
       "end_month": 5,
       "end_day": 8,
-      "discount_rate": 10,
-      "categories": ["건강식품", "효도선물", "가전"]
+      "discount_rate": 15,
+      "categories": ["건강식품", "가전", "효도선물"]
     },
     {
       "name": "여름 시즌 세일",
+      "type": "fixed",
       "start_month": 6,
       "start_day": 15,
       "end_month": 7,
       "end_day": 31,
       "discount_rate": 25,
-      "categories": ["에어컨", "선풍기", "여름의류", "냉방가전"]
-    },
-    {
-      "name": "추석 세일",
-      "start_month": 8,
-      "start_day": 20,
-      "end_month": 9,
-      "end_day": 30,
-      "discount_rate": 20,
-      "categories": ["전자제품", "가전", "식품", "선물세트"]
+      "categories": ["에어컨", "선풍기", "여름의류", "냉방가전", "휴가용품"]
     },
     {
       "name": "가을 시즌 세일",
+      "type": "fixed",
       "start_month": 10,
-      "start_day": 1,
-      "end_month": 10,
-      "end_day": 31,
-      "discount_rate": 15,
-      "categories": ["의류", "패션잡화", "난방가전"]
+      "start_day": 15,
+      "end_month": 11,
+      "end_day": 10,
+      "discount_rate": 20,
+      "categories": ["의류", "패션", "난방가전"]
     },
     {
-      "name": "11월 쇼핑 대전",
+      "name": "11.11 광군제/쇼핑 대전",
+      "type": "fixed",
       "start_month": 11,
       "start_day": 1,
       "end_month": 11,
@@ -92,38 +120,52 @@
     },
     {
       "name": "블랙프라이데이",
+      "type": "fixed",
       "start_month": 11,
-      "start_day": 20,
+      "start_day": 22,
       "end_month": 11,
       "end_day": 30,
       "discount_rate": 35,
-      "categories": ["전자제품", "가전", "패션", "뷰티"]
-    },
-    {
-      "name": "연말 세일",
-      "start_month": 12,
-      "start_day": 1,
-      "end_month": 12,
-      "end_day": 25,
-      "discount_rate": 25,
       "categories": ["전체"]
     },
     {
+      "name": "사이버먼데이",
+      "type": "fixed",
+      "start_month": 12,
+      "start_day": 1,
+      "end_month": 12,
+      "end_day": 3,
+      "discount_rate": 30,
+      "categories": ["전자제품", "IT", "가전"]
+    },
+    {
       "name": "크리스마스 세일",
+      "type": "fixed",
       "start_month": 12,
       "start_day": 15,
       "end_month": 12,
       "end_day": 25,
-      "discount_rate": 20,
-      "categories": ["선물용품", "장난감", "전자기기", "패션"]
+      "discount_rate": 25,
+      "categories": ["선물용품", "완구", "전자제품", "패션", "뷰티"]
     },
     {
       "name": "연말정산 세일",
+      "type": "fixed",
       "start_month": 12,
       "start_day": 26,
       "end_month": 12,
       "end_day": 31,
       "discount_rate": 30,
+      "categories": ["전체"]
+    },
+    {
+      "name": "새해맞이 세일",
+      "type": "fixed",
+      "start_month": 1,
+      "start_day": 1,
+      "end_month": 1,
+      "end_day": 7,
+      "discount_rate": 20,
       "categories": ["전체"]
     }
   ],
@@ -131,9 +173,9 @@
     {
       "name": "신학기 시즌",
       "month": 2,
-      "day_range": [15, 28],
-      "discount_rate": 15,
-      "categories": ["학용품", "노트북", "태블릿", "의류"]
+      "day_range": [20, 28],
+      "discount_rate": 20,
+      "categories": ["학용품", "노트북", "태블릿", "의류", "가방"]
     },
     {
       "name": "빼빼로데이",
