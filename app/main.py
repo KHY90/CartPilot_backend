@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, graph, health, wishlist, ratings, combination_ratings, purchases, admin, preferences
+from app.api import auth, chat, graph, health, wishlist, ratings, combination_ratings, purchases, admin, preferences, bundle
 from app.config import get_settings
 from app.database import init_db, close_db
 from app.services.scheduler import get_scheduler
@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
     app.include_router(chat.router, prefix="/api", tags=["Chat"])
     app.include_router(graph.router, prefix="/api", tags=["Graph"])
+    app.include_router(bundle.router, prefix="/api", tags=["Bundle"])
 
     # Docker healthcheck용 루트 레벨 헬스체크
     @app.get("/health")

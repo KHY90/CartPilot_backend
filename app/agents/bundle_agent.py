@@ -1,6 +1,6 @@
 """
 BUNDLE 에이전트
-묶음 구매 최적화 모드 구현
+묶음 구매 최적화 모드 구현 - 동적 조합 및 호환성 검사 포함
 """
 import json
 import logging
@@ -14,6 +14,8 @@ from app.models.recommendation import BundleCombination, BundleItem, BundleRecom
 from app.services.cache import get_cache
 from app.services.llm_provider import get_llm_provider
 from app.services.naver_shopping import NaverShoppingError, get_naver_client
+from app.services.compatibility_checker import get_compatibility_checker
+from app.services.budget_optimizer import get_budget_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +129,23 @@ async def bundle_agent(state: AgentState) -> Dict[str, Any]:
             total_budget = 1000000  # 기본 100만원
 
         logger.info(f"[BundleAgent] 품목: {items}, 예산: {total_budget}")
+
+        # 호환성 검사
+        compatibility_checker = get_compatibility_checker()
+        compatibility_result = compatibility_checker.check_compatibility(items)
+
+        logger.info(f"[BundleAgent] 호환성 검사 - 그룹: {compatibility_result.detected_group}")
+
+        # 호환성 경고가 있으면 로그
+        if compatibility_result.warnings:
+            for warning in compatibility_result.warnings:
+                logger.warning(f"[BundleAgent] 호환성 경고: {warning}")
+
+        # 예산 최적화 계획 생성
+        budget_optimizer = get_budget_optimizer()
+        budget_plan = budget_optimizer.create_budget_plan(items, total_budget, strategy="balanced")
+
+        logger.info(f"[BundleAgent] 예산 계획 생성 완료")
 
         # 2. 각 품목별 상품 검색
         naver_client = get_naver_client()
@@ -257,10 +276,16 @@ async def bundle_agent(state: AgentState) -> Dict[str, Any]:
                     budget_fit=total_price <= total_budget,
                 ))
 
+        # 보완 품목 제안 추가
+        suggested_items = compatibility_checker.suggest_complementary_items(items, max_suggestions=3)
+
         bundle_recommendation = BundleRecommendation(
             combinations=combinations,
             total_budget=total_budget,
             items_count=len(items),
+            compatibility_warnings=compatibility_result.warnings,
+            suggested_items=[s["name"] for s in suggested_items],
+            detected_group=compatibility_result.detected_group,
         )
 
         logger.info(f"[BundleAgent] 완료 - {len(combinations)}개 조합 생성")
