@@ -22,6 +22,20 @@ from app.services.llm_provider import get_llm_provider
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+# 불확실한 응답 패턴 (사용자가 선물 종류를 모를 때)
+UNCERTAIN_RESPONSE_PATTERNS = [
+    "모르겠", "잘 모르", "글쎄", "추천해", "아무거나",
+    "알아서", "뭐든", "상관없", "맘대로", "골라줘",
+    "아무", "괜찮", "편한대로", "네가 골라", "니가 골라",
+    "알아서 해", "추천 해", "추천좀", "뭐가 좋", "뭘 사",
+]
+
+
+def _is_uncertain_response(message: str) -> bool:
+    """사용자가 불확실한 응답을 했는지 감지"""
+    message_lower = message.lower().strip()
+    return any(pattern in message_lower for pattern in UNCERTAIN_RESPONSE_PATTERNS)
+
 
 ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
 사용자의 전체 대화 내용을 분석하여 의도와 요구사항을 추출하세요.
@@ -61,6 +75,23 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
   - gender: 성별 (male, female)
   - age_group: 연령대 (20대, 30대 등)
   - occasion: 상황 (birthday, farewell, wedding 등)
+  - gift_style: 선물 스타일 (아래 기준 참조)
+
+## 선물 스타일 (gift_style) 판단 기준
+
+GIFT 모드일 때 상황과 관계에 따라 적절한 gift_style을 추론하세요:
+
+- **formal** (격식있는): 직장 상사, 동료 퇴사/승진, 교수님, 거래처 등 비즈니스/공식적 관계
+- **luxury** (고급스러운): 명품, 프리미엄, 브랜드를 원하는 경우
+- **practical** (실용적인): 일상에서 쓸 수 있는 실용적인 선물
+- **sentimental** (감성적인): 연인, 부모님, 특별한 기념일 등 감정적 의미가 중요한 경우
+- **casual** (캐주얼한): 친한 친구, 가벼운 선물, 재미있는 선물
+
+**중요**: 사용자가 명시적으로 스타일을 언급하지 않았더라도 상황에서 유추하세요:
+- "동료 퇴사" → formal (직장 관계는 기본적으로 격식)
+- "상사 승진" → formal 또는 luxury
+- "여자친구 생일" → sentimental 또는 luxury
+- "친구 집들이" → practical 또는 casual
 
 ## 응답 형식 (JSON만 출력)
 
@@ -79,7 +110,8 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
     "relation": "관계 또는 null",
     "gender": "male/female 또는 null",
     "age_group": "연령대 또는 null",
-    "occasion": "상황 또는 null"
+    "occasion": "상황 또는 null",
+    "gift_style": "formal/casual/luxury/practical/sentimental 또는 null"
   },
   "search_keywords": ["메인 키워드", "대체 키워드1", "대체 키워드2"],
   "reasoning": "분석 근거"
@@ -88,11 +120,14 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
 
 중요:
 - items는 사용자가 언급한 것뿐 아니라 맥락에서 유추 가능한 구체적 품목도 포함
-- search_keywords는 실제 쇼핑몰 검색에 적합한 키워드 (최소 3개 이상):
-  - 첫 번째: 가장 정확한 검색어 (예: "30대 남성 퇴사 선물 목도리")
-  - 두 번째: 동의어/유사어 사용 (예: "남자 동료 송별선물 머플러")
-  - 세 번째: 단순화된 검색어 (예: "남성 머플러 선물")
+- **GIFT 모드에서 items가 비어있으면 빈 배열로 두세요** (추후 사용자에게 질문함)
+- search_keywords는 **실제 상품 검색에 적합한 품목 기반 키워드**를 생성하세요:
+  - **잘못된 예**: "30대 남자 동료 퇴사 선물" (파티용품만 검색됨)
+  - **올바른 예**: "남성 가죽지갑", "고급 만년필 선물", "남자 넥타이 선물세트"
+  - items에 있는 품목 + 수식어(선물, 남성, 고급 등) 조합으로 생성
+  - items가 비어있으면 search_keywords도 빈 배열로
 - 정보가 없으면 null로 표시
+- GIFT 모드에서 gift_style은 상황과 관계에서 최대한 유추
 """
 
 
@@ -115,6 +150,28 @@ async def analyze_request(state: AgentState) -> Dict[str, Any]:
     full_context = " ".join(all_user_texts) if all_user_texts else state["raw_query"]
 
     logger.info(f"[Analyzer] 전체 컨텍스트: {full_context}")
+
+    # 현재 메시지가 불확실한 응답인지 확인 (clarification에 대한 "모르겠어요" 답변)
+    current_message = state.get("raw_query", "")
+    is_uncertain = _is_uncertain_response(current_message)
+
+    # 이전 상태에서 clarification이 진행 중이었는지 확인
+    previous_clarification = state.get("clarification_needed", False)
+
+    if is_uncertain and previous_clarification:
+        logger.info(f"[Analyzer] 불확실 응답 감지: '{current_message}' -> 다양한 카테고리 믹스 추천 모드")
+        return {
+            "intent": IntentType.GIFT,
+            "intent_confidence": 0.8,
+            "secondary_intents": [],
+            "requirements": state.get("requirements"),
+            "search_keywords": [],
+            "clarification_needed": False,
+            "clarification_question": None,
+            "clarification_field": None,
+            "processing_step": "analyzed",
+            "uncertain_response": True,  # 불확실 응답 플래그
+        }
 
     try:
         llm_provider = get_llm_provider()
@@ -173,6 +230,7 @@ async def analyze_request(state: AgentState) -> Dict[str, Any]:
                 gender=recipient_data.get("gender"),
                 age_group=recipient_data.get("age_group"),
                 occasion=recipient_data.get("occasion"),
+                gift_style=recipient_data.get("gift_style"),
             )
 
         # Requirements 구성
@@ -251,7 +309,14 @@ def _get_missing_fields(requirements: Requirements, intent_str: str) -> List[str
             missing.append("recipient")
         if not requirements.budget:
             missing.append("budget")
-        # GIFT 모드는 items 없어도 검색 가능 (선물 추천이니까)
+        # recipient와 budget이 있을 때, 구체적인 선물 카테고리가 없으면 질문
+        # items가 비어있거나 너무 추상적이면 gift_category 질문
+        if (requirements.recipient and requirements.recipient.relation and
+            requirements.budget):
+            # items가 없거나 구체적이지 않으면 선물 종류 질문
+            if not requirements.items or len(requirements.items) == 0:
+                missing.append("gift_category")
+            # gift_style이 없으면 선물 분위기 질문은 생략 (자동 유추로 충분)
 
     elif intent_str == "VALUE":
         if not requirements.items:
@@ -281,6 +346,26 @@ def _get_clarification_question(field: str, intent_str: str) -> tuple[str, str]:
             "items",
             "어떤 품목들을 함께 구매하실 건가요?" if intent_str == "BUNDLE"
             else "어떤 종류의 제품을 찾으시나요?"
+        ),
+        "gift_category": (
+            "gift_category",
+            "어떤 종류의 선물을 찾으시나요?\n"
+            "• 패션/액세서리 (지갑, 벨트, 넥타이, 목도리 등)\n"
+            "• 뷰티/향수 (스킨케어, 향수, 디퓨저 등)\n"
+            "• 테크/가전 (이어폰, 스마트워치, 미니가전 등)\n"
+            "• 리빙/인테리어 (머그컵, 텀블러, 인테리어소품 등)\n"
+            "• 식품/건강 (건강식품, 차, 커피 등)\n"
+            "• 문구/오피스 (만년필, 다이어리, 명함지갑 등)\n"
+            "• 잘 모르겠어요 (추천해 주세요)"
+        ),
+        "gift_style": (
+            "gift_style",
+            "어떤 느낌의 선물을 원하시나요?\n"
+            "• 격식있는 선물 (직장, 공식적인 자리)\n"
+            "• 고급스러운 선물 (프리미엄, 브랜드)\n"
+            "• 실용적인 선물 (일상에서 쓸 수 있는)\n"
+            "• 감성적인 선물 (마음을 담은)\n"
+            "• 캐주얼한 선물 (가볍고 재미있는)"
         ),
     }
     return questions.get(field, ("unknown", "추가 정보가 필요합니다."))

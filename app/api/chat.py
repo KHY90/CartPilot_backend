@@ -106,17 +106,21 @@ async def send_chat_message(
         # LangGraph MemorySaver용 config (thread_id로 대화 구분)
         config = {"configurable": {"thread_id": session.session_id}}
 
+        # 세션에서 이전 clarification 상태와 requirements 가져오기
+        prev_clarification_needed = session.clarification_needed
+        prev_requirements = session.current_requirements
+
         initial_state = {
             "raw_query": request.message,
             "session_id": session.session_id,
             "intent": None,
             "intent_confidence": 0.0,
             "secondary_intents": [],
-            "requirements": None,
+            "requirements": prev_requirements,  # 이전 requirements 유지
             "search_keywords": [],  # LLM이 생성할 검색 키워드
             "search_results": [],
             "recommendations": None,
-            "clarification_needed": False,
+            "clarification_needed": prev_clarification_needed,  # 이전 clarification 상태
             "clarification_question": None,
             "clarification_field": None,
             "error": None,
@@ -188,6 +192,12 @@ async def send_chat_message(
             logger.info(f"검색 결과 캐시 저장: {cache_key}, {len(cards_data)}개 상품")
         else:
             logger.debug(f"캐시 저장 스킵: recommendations={bool(recommendations)}")
+
+        # 세션에 현재 상태 저장 (다음 대화에서 사용)
+        session.clarification_needed = result.get("clarification_needed", False)
+        session.clarification_field = result.get("clarification_field")
+        session.current_requirements = result.get("requirements")
+        session.current_intent = result.get("intent")
 
         # 응답 생성
         if result.get("clarification_needed"):

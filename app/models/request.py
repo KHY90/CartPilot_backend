@@ -56,6 +56,10 @@ class RecipientInfo(BaseModel):
     gender: Optional[Literal["male", "female", "unknown"]] = Field(None, description="성별")
     age_group: Optional[str] = Field(None, description="연령대 (20대, 30대 등)")
     occasion: Optional[str] = Field(None, description="상황 (생일, 퇴사 등)")
+    gift_style: Optional[Literal["formal", "casual", "luxury", "practical", "sentimental"]] = Field(
+        None,
+        description="선물 스타일 (formal: 격식있는, casual: 캐주얼한, luxury: 고급스러운, practical: 실용적인, sentimental: 감성적인)"
+    )
 
 
 class Constraints(BaseModel):

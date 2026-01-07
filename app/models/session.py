@@ -32,6 +32,10 @@ class SessionState(BaseModel):
     current_intent: Optional[IntentType] = Field(None)
     current_requirements: Optional[Requirements] = Field(None)
 
+    # Clarification 상태 (대화 간 유지)
+    clarification_needed: bool = Field(default=False, description="추가 질문 필요 여부")
+    clarification_field: Optional[str] = Field(None, description="질문 대상 필드")
+
     # 캐시된 결과
     cached_products: Dict[str, List[ProductCandidate]] = Field(default_factory=dict)
     cached_recommendations: Optional[Dict[str, Any]] = Field(None)
