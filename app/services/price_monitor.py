@@ -38,11 +38,10 @@ class PriceMonitorService:
 
         async with async_session_factory() as db:
             try:
-                # 알림이 활성화된 모든 관심상품 조회
+                # 모든 관심상품 조회 (가격 수집은 모든 상품 대상)
                 stmt = (
                     select(WishlistItem)
                     .options(selectinload(WishlistItem.user))
-                    .where(WishlistItem.notification_enabled == True)
                 )
                 result = await db.execute(stmt)
                 items = result.scalars().all()
@@ -106,25 +105,37 @@ class PriceMonitorService:
             # 이전 가격 저장
             previous_price = item.current_price
 
-            # 가격이 변경된 경우에만 업데이트
-            if current_price != previous_price:
-                # 가격 이력 추가
+            # 오늘 이미 가격이 기록되었는지 확인
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_history_stmt = select(PriceHistory).where(
+                and_(
+                    PriceHistory.wishlist_item_id == item.id,
+                    PriceHistory.recorded_at >= today_start,
+                )
+            )
+            today_history_result = await db.execute(today_history_stmt)
+            already_recorded_today = today_history_result.scalar_one_or_none() is not None
+
+            # 오늘 아직 기록되지 않았으면 가격 이력 추가 (가격 변동 여부와 무관하게)
+            if not already_recorded_today:
                 price_history = PriceHistory(
                     wishlist_item_id=item.id,
                     price=current_price,
                     recorded_at=datetime.utcnow(),
                 )
                 db.add(price_history)
-
-                # 현재 가격 업데이트
-                item.current_price = current_price
                 updated = True
 
-                # 90일 최저가 계산
-                lowest_90 = await self._calculate_lowest_90days(db, item.id, current_price)
-                item.lowest_price_90days = lowest_90
+            # 현재 가격 업데이트
+            if current_price != previous_price:
+                item.current_price = current_price
 
-                # 알림 조건 확인 (새로운 조건 포함)
+            # 90일 최저가 계산
+            lowest_90 = await self._calculate_lowest_90days(db, item.id, current_price)
+            item.lowest_price_90days = lowest_90
+
+            # 알림 발송 조건: notification_enabled가 True인 경우에만
+            if item.notification_enabled and current_price != previous_price:
                 if self._should_send_alert(item, current_price, lowest_90, previous_price):
                     user = item.user
                     if user and user.is_active:
