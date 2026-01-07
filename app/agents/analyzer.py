@@ -61,6 +61,23 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
   - gender: 성별 (male, female)
   - age_group: 연령대 (20대, 30대 등)
   - occasion: 상황 (birthday, farewell, wedding 등)
+  - gift_style: 선물 스타일 (아래 기준 참조)
+
+## 선물 스타일 (gift_style) 판단 기준
+
+GIFT 모드일 때 상황과 관계에 따라 적절한 gift_style을 추론하세요:
+
+- **formal** (격식있는): 직장 상사, 동료 퇴사/승진, 교수님, 거래처 등 비즈니스/공식적 관계
+- **luxury** (고급스러운): 명품, 프리미엄, 브랜드를 원하는 경우
+- **practical** (실용적인): 일상에서 쓸 수 있는 실용적인 선물
+- **sentimental** (감성적인): 연인, 부모님, 특별한 기념일 등 감정적 의미가 중요한 경우
+- **casual** (캐주얼한): 친한 친구, 가벼운 선물, 재미있는 선물
+
+**중요**: 사용자가 명시적으로 스타일을 언급하지 않았더라도 상황에서 유추하세요:
+- "동료 퇴사" → formal (직장 관계는 기본적으로 격식)
+- "상사 승진" → formal 또는 luxury
+- "여자친구 생일" → sentimental 또는 luxury
+- "친구 집들이" → practical 또는 casual
 
 ## 응답 형식 (JSON만 출력)
 
@@ -79,7 +96,8 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
     "relation": "관계 또는 null",
     "gender": "male/female 또는 null",
     "age_group": "연령대 또는 null",
-    "occasion": "상황 또는 null"
+    "occasion": "상황 또는 null",
+    "gift_style": "formal/casual/luxury/practical/sentimental 또는 null"
   },
   "search_keywords": ["메인 키워드", "대체 키워드1", "대체 키워드2"],
   "reasoning": "분석 근거"
@@ -93,6 +111,7 @@ ANALYSIS_PROMPT = """당신은 쇼핑 요청을 분석하는 AI입니다.
   - 두 번째: 동의어/유사어 사용 (예: "남자 동료 송별선물 머플러")
   - 세 번째: 단순화된 검색어 (예: "남성 머플러 선물")
 - 정보가 없으면 null로 표시
+- GIFT 모드에서 gift_style은 상황과 관계에서 최대한 유추하되, 확실하지 않으면 null
 """
 
 
@@ -173,6 +192,7 @@ async def analyze_request(state: AgentState) -> Dict[str, Any]:
                 gender=recipient_data.get("gender"),
                 age_group=recipient_data.get("age_group"),
                 occasion=recipient_data.get("occasion"),
+                gift_style=recipient_data.get("gift_style"),
             )
 
         # Requirements 구성
@@ -251,6 +271,11 @@ def _get_missing_fields(requirements: Requirements, intent_str: str) -> List[str
             missing.append("recipient")
         if not requirements.budget:
             missing.append("budget")
+        # gift_style이 없으면 선물 분위기를 질문 (recipient와 budget이 있을 때만)
+        if (requirements.recipient and requirements.recipient.relation and
+            requirements.budget and
+            (not requirements.recipient.gift_style)):
+            missing.append("gift_style")
         # GIFT 모드는 items 없어도 검색 가능 (선물 추천이니까)
 
     elif intent_str == "VALUE":
@@ -281,6 +306,15 @@ def _get_clarification_question(field: str, intent_str: str) -> tuple[str, str]:
             "items",
             "어떤 품목들을 함께 구매하실 건가요?" if intent_str == "BUNDLE"
             else "어떤 종류의 제품을 찾으시나요?"
+        ),
+        "gift_style": (
+            "gift_style",
+            "어떤 느낌의 선물을 원하시나요?\n"
+            "• 격식있는 선물 (직장, 공식적인 자리)\n"
+            "• 고급스러운 선물 (프리미엄, 브랜드)\n"
+            "• 실용적인 선물 (일상에서 쓸 수 있는)\n"
+            "• 감성적인 선물 (마음을 담은)\n"
+            "• 캐주얼한 선물 (가볍고 재미있는)"
         ),
     }
     return questions.get(field, ("unknown", "추가 정보가 필요합니다."))

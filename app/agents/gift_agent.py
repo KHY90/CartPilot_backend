@@ -23,6 +23,8 @@ GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
 
 예산: {budget_info}
 
+선물 스타일: {gift_style_info}
+
 {user_preferences}
 
 상품 목록:
@@ -33,7 +35,7 @@ GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
   "recommendations": [
     {{
       "product_id": "상품 ID",
-      "recommendation_reason": "이 상품을 추천하는 2-3문장 이유 (받는 사람 특성과 연결)",
+      "recommendation_reason": "이 상품을 추천하는 2-3문장 이유 (받는 사람 특성과 선물 스타일에 맞게 설명)",
       "warnings": ["주의사항 (있으면)"]
     }}
   ],
@@ -41,12 +43,43 @@ GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
   "occasion": "상황 (생일, 퇴사 등)"
 }}
 
-선택 기준:
+## 선물 스타일별 선택 기준
+
+**격식있는 선물 (formal)**:
+- 직장 동료, 상사, 거래처 등 비즈니스 관계에 적합
+- 고급스러운 포장이 가능한 브랜드 제품 우선
+- 만년필, 명함지갑, 고급 차/커피 세트, 디퓨저, 고급 수건세트, 와인/위스키, 골프용품 등
+- 너무 개인적이거나 저렴해 보이는 상품 제외 (과자, 쿠키, 캐릭터 상품 등)
+- 품격과 센스가 느껴지는 선물 선택
+
+**고급스러운 선물 (luxury)**:
+- 프리미엄 브랜드, 명품 위주
+- 품질과 브랜드 가치가 중요
+- 가격대가 높더라도 퀄리티 우선
+
+**실용적인 선물 (practical)**:
+- 일상에서 자주 사용할 수 있는 제품
+- 가성비와 실용성 균형
+- 가전, 생활용품, 주방용품 등
+
+**감성적인 선물 (sentimental)**:
+- 마음을 담은 의미있는 선물
+- 커스텀/각인 가능한 제품
+- 기념이 되는 특별한 아이템
+
+**캐주얼한 선물 (casual)**:
+- 부담없이 주고받을 수 있는 선물
+- 재미있고 트렌디한 아이템
+- 가격보다 센스가 중요
+
+## 공통 선택 기준
 1. 받는 사람의 특성(나이, 성별, 관계)에 맞는 상품
-2. 예산 범위 내 상품 우선
+2. 예산 범위 내 상품 (단, 스타일에 따라 예산 상한에 가까운 상품도 고려)
 3. 해당 상황(occasion)에 적합한 상품
-4. 실용적이면서도 의미 있는 선물
+4. 선물 스타일에 맞는 품격/분위기
 5. 사용자의 구매 성향과 선호도 반영 (해당되는 경우)
+
+**중요**: 선물 스타일이 'formal'이면 저렴하거나 캐주얼한 상품은 절대 추천하지 마세요.
 """
 
 
@@ -122,6 +155,38 @@ def _build_budget_info(requirements: Any) -> str:
         return f"최대 {_format_price(b.max_price)}"
 
     return "지정되지 않음"
+
+
+def _build_gift_style_info(requirements: Any) -> str:
+    """선물 스타일 정보 문자열 생성"""
+    if not requirements or not requirements.recipient:
+        return "지정되지 않음 (기본: 상황에 맞게 판단)"
+
+    r = requirements.recipient
+    style = r.gift_style if hasattr(r, 'gift_style') and r.gift_style else None
+
+    if style:
+        style_descriptions = {
+            "formal": "격식있는 선물 (formal) - 품격있고 세련된 선물",
+            "luxury": "고급스러운 선물 (luxury) - 프리미엄/브랜드 위주",
+            "practical": "실용적인 선물 (practical) - 일상에서 활용 가능한",
+            "sentimental": "감성적인 선물 (sentimental) - 마음을 담은 의미있는",
+            "casual": "캐주얼한 선물 (casual) - 부담없이 주고받는",
+        }
+        return style_descriptions.get(style, style)
+
+    # 스타일이 없으면 상황에서 추론
+    occasion = r.occasion
+    relation = r.relation
+
+    # 직장 관련이면 기본적으로 formal 권장
+    formal_occasions = {"farewell", "promotion", "welcome", "retirement"}
+    formal_relations = {"colleague", "boss", "professor", "teacher", "client"}
+
+    if occasion in formal_occasions or relation in formal_relations:
+        return "격식있는 선물 권장 (직장/공식 관계)"
+
+    return "지정되지 않음 (상황에 맞게 판단)"
 
 
 def _build_product_list(products: List[ProductCandidate]) -> str:
@@ -238,6 +303,7 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         prompt = GIFT_RECOMMENDATION_PROMPT.format(
             recipient_info=_build_recipient_info(requirements),
             budget_info=_build_budget_info(requirements),
+            gift_style_info=_build_gift_style_info(requirements),
             user_preferences=user_prefs if user_prefs else "",
             products=_build_product_list(unique_products),
         )
