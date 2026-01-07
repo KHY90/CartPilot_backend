@@ -36,6 +36,28 @@ CATEGORY_CONTEXT = {
         "allowed_categories": ["화장품/미용", "헬스/건강"],
         "exclude_keywords": ["파우치", "케이스", "거울"],
     },
+    "gift": {
+        "keywords": ["선물", "퇴사", "승진", "생일", "기념일", "송별"],
+        "allowed_categories": [],  # 선물은 카테고리 제한 없음
+        "exclude_keywords": [
+            # 파티용품/장식품 제외
+            "배너", "현수막", "가랜드", "풍선", "파티", "장식",
+            "방명록", "서명판", "표지판", "포토존", "이벤트용",
+            # 포장재 제외
+            "포장지", "리본", "쇼핑백", "선물상자만",
+            # 기타 부적절한 것
+            "은퇴", "파티장식", "글리터", "스트랜드",
+        ],
+    },
+}
+
+# GIFT 모드용 기본 선물 품목 (재검색시 사용)
+GIFT_DEFAULT_ITEMS = {
+    "formal": ["지갑", "만년필", "넥타이", "명함지갑", "벨트", "스카프"],
+    "luxury": ["브랜드 지갑", "프리미엄 선물세트", "고급 펜"],
+    "practical": ["텀블러", "보조배터리", "무선이어폰", "손목시계"],
+    "casual": ["머그컵", "키링", "캐릭터 굿즈", "에코백"],
+    "sentimental": ["포토북", "각인 선물", "커스텀 굿즈"],
 }
 
 # 검증 프롬프트
@@ -72,7 +94,7 @@ VALIDATION_PROMPT = """당신은 상품 적합성 검증 전문가입니다.
 """
 
 
-def _extract_intent_context(raw_query: str) -> Dict[str, Any]:
+def _extract_intent_context(raw_query: str, intent: Optional[IntentType] = None) -> Dict[str, Any]:
     """사용자 요청에서 의도 컨텍스트 추출"""
     context = {
         "type": None,
@@ -81,6 +103,14 @@ def _extract_intent_context(raw_query: str) -> Dict[str, Any]:
     }
 
     raw_query_lower = raw_query.lower()
+
+    # GIFT 의도면 gift 컨텍스트 강제 적용
+    if intent == IntentType.GIFT:
+        gift_config = CATEGORY_CONTEXT["gift"]
+        context["type"] = "gift"
+        context["allowed_categories"] = gift_config["allowed_categories"]
+        context["exclude_keywords"] = gift_config["exclude_keywords"]
+        return context
 
     for context_type, config in CATEGORY_CONTEXT.items():
         if any(kw in raw_query_lower for kw in config["keywords"]):
@@ -288,8 +318,8 @@ async def validation_agent(state: AgentState) -> Dict[str, Any]:
             "processing_step": "validation_skipped",
         }
 
-    # 2. 의도 컨텍스트 추출
-    intent_context = _extract_intent_context(raw_query)
+    # 2. 의도 컨텍스트 추출 (intent 전달하여 GIFT 처리)
+    intent_context = _extract_intent_context(raw_query, intent)
     logger.info(f"[ValidationAgent] 의도 컨텍스트: {intent_context.get('type')}")
 
     # 3. 규칙 기반 1차 필터링
@@ -387,7 +417,14 @@ async def validation_agent(state: AgentState) -> Dict[str, Any]:
 
     elif retry_count < 1:
         # 적합 상품 0개 → 재검색 트리거
-        new_keywords = suggested_keywords if suggested_keywords else search_keywords
+        # GIFT 의도면 품목 기반 키워드로 재검색
+        if intent == IntentType.GIFT:
+            new_keywords = _generate_gift_retry_keywords(state)
+        elif suggested_keywords:
+            new_keywords = suggested_keywords
+        else:
+            new_keywords = search_keywords
+
         logger.info(f"[ValidationAgent] 재검색 필요 (적합 0개) - 새 키워드: {new_keywords}")
         return {
             "validation_passed": False,
@@ -407,3 +444,33 @@ async def validation_agent(state: AgentState) -> Dict[str, Any]:
             "validation_feedback": "검색 결과가 요청과 일치하지 않습니다.",
             "processing_step": "validation_failed",
         }
+
+
+def _generate_gift_retry_keywords(state: AgentState) -> List[str]:
+    """GIFT 의도용 재검색 키워드 생성 - 품목 기반"""
+    requirements = state.get("requirements")
+    keywords = []
+
+    # 성별 수식어
+    gender_prefix = ""
+    if requirements and requirements.recipient and requirements.recipient.gender:
+        gender_prefix = {"male": "남성", "female": "여성"}.get(
+            requirements.recipient.gender, ""
+        )
+
+    # gift_style에 따른 기본 품목 선택
+    gift_style = "formal"  # 기본값
+    if requirements and requirements.recipient:
+        gift_style = getattr(requirements.recipient, 'gift_style', 'formal') or 'formal'
+
+    default_items = GIFT_DEFAULT_ITEMS.get(gift_style, GIFT_DEFAULT_ITEMS["formal"])
+
+    # 품목 기반 키워드 생성
+    for item in default_items[:4]:
+        if gender_prefix:
+            keywords.append(f"{gender_prefix} {item} 선물")
+        else:
+            keywords.append(f"{item} 선물")
+
+    logger.info(f"[ValidationAgent] GIFT 재검색 키워드 생성: {keywords}")
+    return keywords

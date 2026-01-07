@@ -3,6 +3,7 @@ GIFT 에이전트
 선물 추천 모드 구현
 """
 import json
+import logging
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -13,6 +14,17 @@ from app.models.recommendation import GiftRecommendation, RecommendationCard
 from app.services.cache import get_cache
 from app.services.llm_provider import get_llm_provider
 from app.services.naver_shopping import NaverShoppingError, get_naver_client
+
+logger = logging.getLogger(__name__)
+
+# 다양한 카테고리 믹스 추천용 키워드 (불확실 응답 시 사용)
+MIXED_CATEGORY_KEYWORDS = {
+    "fashion": ["남성 지갑 선물", "가죽 벨트 선물", "넥타이 선물세트", "머플러 선물"],
+    "office": ["고급 만년필", "명함지갑 선물", "다이어리 선물", "탁상시계"],
+    "tech": ["무선이어폰", "보조배터리 선물", "스마트워치", "블루투스 스피커"],
+    "beauty": ["남성 향수 선물", "디퓨저 선물세트", "핸드크림 세트"],
+    "living": ["텀블러 선물", "머그컵 세트", "인테리어 소품"],
+}
 
 # 선물 추천 프롬프트
 GIFT_RECOMMENDATION_PROMPT = """당신은 선물 추천 전문가입니다.
@@ -245,9 +257,19 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         }
 
     try:
-        # 1. 검색어 생성 (LLM이 생성한 search_keywords 우선 사용)
+        # 1. 검색어 생성
         search_keywords = state.get("search_keywords", [])
-        if search_keywords:
+        items = requirements.items if requirements else []
+        is_uncertain = state.get("uncertain_response", False)
+
+        # 불확실 응답("잘 모르겠어")인 경우 다양한 카테고리에서 믹스 추천
+        if is_uncertain:
+            logger.info("[GiftAgent] 불확실 응답 -> 다양한 카테고리 믹스 추천 모드")
+            search_queries = _generate_mixed_category_queries(requirements)
+        # items가 있으면 items 기반 검색어 생성
+        elif items and len(items) > 0:
+            search_queries = _generate_item_based_search_queries(items, requirements)
+        elif search_keywords:
             search_queries = search_keywords
         else:
             search_queries = _generate_gift_search_queries(requirements)
@@ -377,50 +399,106 @@ async def gift_agent(state: AgentState) -> Dict[str, Any]:
         }
 
 
+def _generate_item_based_search_queries(items: List[str], requirements: Any) -> List[str]:
+    """items 기반 검색어 생성 - 실제 상품 검색에 적합한 키워드"""
+    queries = []
+
+    # 수식어 결정
+    gender_prefix = ""
+    style_prefix = ""
+
+    if requirements and requirements.recipient:
+        r = requirements.recipient
+        if r.gender:
+            gender_prefix = {"male": "남성", "female": "여성"}.get(r.gender, "")
+        if hasattr(r, 'gift_style') and r.gift_style:
+            style_prefix = {
+                "formal": "고급",
+                "luxury": "프리미엄",
+                "practical": "실용적인",
+                "casual": "",
+                "sentimental": "특별한",
+            }.get(r.gift_style, "")
+
+    # 각 item에 대해 검색어 생성
+    for item in items[:5]:  # 최대 5개 품목
+        # 기본 검색어: 품목 + 선물
+        queries.append(f"{item} 선물")
+
+        # 성별 + 품목
+        if gender_prefix:
+            queries.append(f"{gender_prefix} {item}")
+
+        # 스타일 + 품목 + 선물
+        if style_prefix:
+            queries.append(f"{style_prefix} {item} 선물")
+
+    # 중복 제거 및 최대 8개 반환
+    seen = set()
+    unique_queries = []
+    for q in queries:
+        if q not in seen:
+            seen.add(q)
+            unique_queries.append(q)
+
+    return unique_queries[:8]
+
+
 def _generate_gift_search_queries(requirements: Any) -> List[str]:
-    """선물 검색어 생성"""
+    """기본 선물 검색어 생성 (items가 없을 때 fallback)"""
     queries = []
 
     if requirements and requirements.recipient:
         r = requirements.recipient
 
-        # 기본 선물 검색어
-        base = "선물"
+        # 성별 + 선물 조합 (더 일반적인 품목으로)
+        gender_kr = ""
+        if r.gender:
+            gender_kr = {"male": "남성", "female": "여성"}.get(r.gender, "")
 
-        # 성별 + 나이대 조합
-        if r.gender and r.age_group:
-            gender_kr = {"male": "남자", "female": "여자"}.get(r.gender, "")
-            queries.append(f"{r.age_group} {gender_kr} {base}")
+        # gift_style에 따른 기본 품목 추천
+        style_items = {
+            "formal": ["지갑 선물", "만년필 선물", "넥타이 선물", "명함지갑"],
+            "luxury": ["프리미엄 선물세트", "브랜드 지갑", "명품 소품"],
+            "practical": ["텀블러 선물", "보조배터리 선물", "이어폰"],
+            "sentimental": ["각인 선물", "커스텀 선물", "포토북"],
+            "casual": ["머그컵 선물", "간식 선물세트", "캐릭터 굿즈"],
+        }
 
-        # 상황별 검색어
-        if r.occasion:
-            occasion_kr = {
-                "birthday": "생일선물",
-                "farewell": "퇴사선물",
-                "welcome": "입사선물",
-                "promotion": "승진선물",
-                "wedding": "결혼선물",
-                "anniversary": "기념일선물",
-                "christmas": "크리스마스선물",
-                "parents_day": "어버이날선물",
-            }.get(r.occasion, f"{r.occasion}선물")
-            queries.append(occasion_kr)
+        gift_style = r.gift_style if hasattr(r, 'gift_style') and r.gift_style else "formal"
+        default_items = style_items.get(gift_style, style_items["formal"])
 
-        # 관계별 검색어
-        if r.relation:
-            relation_kr = {
-                "colleague": "직장동료선물",
-                "boss": "상사선물",
-                "friend": "친구선물",
-                "girlfriend": "여자친구선물",
-                "boyfriend": "남자친구선물",
-                "parent": "부모님선물",
-            }.get(r.relation)
-            if relation_kr:
-                queries.append(relation_kr)
+        for item in default_items:
+            if gender_kr:
+                queries.append(f"{gender_kr} {item}")
+            else:
+                queries.append(item)
 
     # 기본 검색어 추가
     if not queries:
-        queries = ["인기선물", "베스트선물", "추천선물"]
+        queries = ["선물세트", "인기선물", "베스트선물"]
 
     return queries[:5]  # 최대 5개
+
+
+def _generate_mixed_category_queries(requirements: Any) -> List[str]:
+    """다양한 카테고리에서 골고루 검색어 생성 (불확실 응답용)"""
+    queries = []
+
+    # 성별 수식어
+    gender_prefix = ""
+    if requirements and requirements.recipient and requirements.recipient.gender:
+        gender_prefix = {"male": "남성", "female": "여성"}.get(
+            requirements.recipient.gender, ""
+        )
+
+    # 각 카테고리에서 1-2개씩 선택
+    for category, keywords in MIXED_CATEGORY_KEYWORDS.items():
+        for keyword in keywords[:2]:  # 각 카테고리에서 2개
+            if gender_prefix and "남성" not in keyword and "여성" not in keyword:
+                queries.append(f"{gender_prefix} {keyword}")
+            else:
+                queries.append(keyword)
+
+    logger.info(f"[GiftAgent] 믹스 카테고리 검색어: {queries[:10]}")
+    return queries[:10]  # 최대 10개
