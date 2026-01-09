@@ -44,6 +44,7 @@ class KeywordExpander:
             확장된 키워드 리스트 (원본 포함)
         """
         expanded: Set[str] = {keyword}
+        keyword_lower = keyword.lower()
 
         # 카테고리에서 동의어 찾기
         categories = self._synonyms.get("categories", {})
@@ -72,6 +73,46 @@ class KeywordExpander:
             if attr in keyword:
                 for syn in synonyms[:2]:
                     expanded.add(keyword.replace(attr, syn))
+
+        # 브랜드 확장
+        brands = self._synonyms.get("brands", {})
+        for brand, synonyms in brands.items():
+            if brand.lower() in keyword_lower or keyword_lower in brand.lower():
+                for syn in synonyms[:2]:
+                    expanded.add(syn)
+                break
+            for syn in synonyms:
+                if syn.lower() in keyword_lower:
+                    expanded.add(brand)
+                    break
+
+        # 색상 확장
+        colors = self._synonyms.get("colors", {})
+        for color, synonyms in colors.items():
+            if color in keyword:
+                for syn in synonyms[:2]:
+                    expanded.add(keyword.replace(color, syn))
+                break
+            for syn in synonyms:
+                if syn in keyword:
+                    expanded.add(keyword.replace(syn, color))
+                    break
+
+        # 재질 확장
+        materials = self._synonyms.get("materials", {})
+        for material, synonyms in materials.items():
+            if material in keyword:
+                for syn in synonyms[:2]:
+                    expanded.add(keyword.replace(material, syn))
+                break
+
+        # 사이즈 확장
+        sizes = self._synonyms.get("sizes", {})
+        for size, synonyms in sizes.items():
+            if size in keyword:
+                for syn in synonyms[:2]:
+                    expanded.add(keyword.replace(size, syn))
+                break
 
         return list(expanded)[:max_expansions + 1]
 
@@ -148,6 +189,147 @@ class KeywordExpander:
                     all_queries.append(exp)
 
         return all_queries[:max_total]
+
+    def detect_occasion(self, query: str) -> Optional[str]:
+        """
+        검색어에서 행사/기념일 감지
+
+        Args:
+            query: 검색어
+
+        Returns:
+            감지된 행사명 또는 None
+        """
+        occasions = self._synonyms.get("occasions", {})
+        query_lower = query.lower()
+
+        for occasion, synonyms in occasions.items():
+            if occasion in query:
+                return occasion
+            for syn in synonyms:
+                if syn.lower() in query_lower:
+                    return occasion
+
+        return None
+
+    def detect_recipient(self, query: str) -> Optional[str]:
+        """
+        검색어에서 선물 대상 감지
+
+        Args:
+            query: 검색어
+
+        Returns:
+            감지된 대상 또는 None
+        """
+        recipients = self._synonyms.get("recipients", {})
+        query_lower = query.lower()
+
+        for recipient, synonyms in recipients.items():
+            if recipient in query:
+                return recipient
+            for syn in synonyms:
+                if syn.lower() in query_lower:
+                    return recipient
+
+        return None
+
+    def extract_brand(self, query: str) -> Optional[str]:
+        """
+        검색어에서 브랜드명 추출
+
+        Args:
+            query: 검색어
+
+        Returns:
+            감지된 브랜드명 또는 None
+        """
+        brands = self._synonyms.get("brands", {})
+        query_lower = query.lower()
+
+        for brand, synonyms in brands.items():
+            if brand.lower() in query_lower:
+                return brand
+            for syn in synonyms:
+                if syn.lower() in query_lower:
+                    return brand
+
+        return None
+
+    def extract_color(self, query: str) -> Optional[str]:
+        """
+        검색어에서 색상 추출
+
+        Args:
+            query: 검색어
+
+        Returns:
+            감지된 색상 또는 None
+        """
+        colors = self._synonyms.get("colors", {})
+        query_lower = query.lower()
+
+        for color, synonyms in colors.items():
+            if color in query:
+                return color
+            for syn in synonyms:
+                if syn.lower() in query_lower:
+                    return color
+
+        return None
+
+    def extract_material(self, query: str) -> Optional[str]:
+        """
+        검색어에서 재질 추출
+
+        Args:
+            query: 검색어
+
+        Returns:
+            감지된 재질 또는 None
+        """
+        materials = self._synonyms.get("materials", {})
+
+        for material, synonyms in materials.items():
+            if material in query:
+                return material
+            for syn in synonyms:
+                if syn in query:
+                    return material
+
+        return None
+
+    def parse_query_attributes(self, query: str) -> dict:
+        """
+        검색어에서 다양한 속성 추출
+
+        Args:
+            query: 검색어
+
+        Returns:
+            추출된 속성들 {occasion, recipient, brand, color, material, attributes}
+        """
+        result = {
+            "occasion": self.detect_occasion(query),
+            "recipient": self.detect_recipient(query),
+            "brand": self.extract_brand(query),
+            "color": self.extract_color(query),
+            "material": self.extract_material(query),
+            "attributes": [],
+        }
+
+        # 속성(가성비, 고급, 무선 등) 추출
+        attributes = self._synonyms.get("attributes", {})
+        for attr, synonyms in attributes.items():
+            if attr in query:
+                result["attributes"].append(attr)
+            else:
+                for syn in synonyms:
+                    if syn in query:
+                        result["attributes"].append(attr)
+                        break
+
+        return result
 
 
 # 싱글톤 인스턴스

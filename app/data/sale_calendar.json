@@ -17,6 +17,15 @@
       "2028": {"start": "10-02", "end": "10-04"},
       "2029": {"start": "09-21", "end": "09-23"},
       "2030": {"start": "09-11", "end": "09-13"}
+    },
+    "부처님오신날": {
+      "2024": {"start": "05-15", "end": "05-15"},
+      "2025": {"start": "05-05", "end": "05-05"},
+      "2026": {"start": "05-24", "end": "05-24"},
+      "2027": {"start": "05-13", "end": "05-13"},
+      "2028": {"start": "05-02", "end": "05-02"},
+      "2029": {"start": "05-20", "end": "05-20"},
+      "2030": {"start": "05-09", "end": "05-09"}
     }
   },
   "annual_sales": [
@@ -86,7 +95,27 @@
       "end_month": 5,
       "end_day": 8,
       "discount_rate": 15,
-      "categories": ["건강식품", "가전", "효도선물"]
+      "categories": ["건강식품", "가전", "효도선물", "안마기", "건강용품"]
+    },
+    {
+      "name": "스승의날 세일",
+      "type": "fixed",
+      "start_month": 5,
+      "start_day": 10,
+      "end_month": 5,
+      "end_day": 15,
+      "discount_rate": 10,
+      "categories": ["선물용품", "화장품", "꽃배달", "상품권"]
+    },
+    {
+      "name": "가정의달 통합세일",
+      "type": "fixed",
+      "start_month": 5,
+      "start_day": 1,
+      "end_month": 5,
+      "end_day": 31,
+      "discount_rate": 15,
+      "categories": ["가전", "가구", "생활용품", "가족선물"]
     },
     {
       "name": "여름 시즌 세일",
@@ -99,6 +128,26 @@
       "categories": ["에어컨", "선풍기", "여름의류", "냉방가전", "휴가용품"]
     },
     {
+      "name": "여름휴가 시즌",
+      "type": "fixed",
+      "start_month": 7,
+      "start_day": 15,
+      "end_month": 8,
+      "end_day": 15,
+      "discount_rate": 20,
+      "categories": ["여행용품", "캠핑", "수영복", "선크림", "캐리어"]
+    },
+    {
+      "name": "개학시즌 세일",
+      "type": "fixed",
+      "start_month": 8,
+      "start_day": 20,
+      "end_month": 9,
+      "end_day": 5,
+      "discount_rate": 15,
+      "categories": ["학용품", "노트북", "태블릿", "가방", "의류"]
+    },
+    {
       "name": "가을 시즌 세일",
       "type": "fixed",
       "start_month": 10,
@@ -107,6 +156,16 @@
       "end_day": 10,
       "discount_rate": 20,
       "categories": ["의류", "패션", "난방가전"]
+    },
+    {
+      "name": "핼러윈 세일",
+      "type": "fixed",
+      "start_month": 10,
+      "start_day": 25,
+      "end_month": 10,
+      "end_day": 31,
+      "discount_rate": 15,
+      "categories": ["코스튬", "파티용품", "과자", "데코용품"]
     },
     {
       "name": "11.11 광군제/쇼핑 대전",
@@ -183,23 +242,353 @@
       "day_range": [8, 11],
       "discount_rate": 10,
       "categories": ["과자", "선물용품"]
+    },
+    {
+      "name": "로즈데이",
+      "month": 5,
+      "day_range": [12, 14],
+      "discount_rate": 10,
+      "categories": ["꽃배달", "선물용품", "악세서리"]
+    },
+    {
+      "name": "키스데이",
+      "month": 6,
+      "day_range": [12, 14],
+      "discount_rate": 10,
+      "categories": ["화장품", "뷰티", "악세서리"]
+    },
+    {
+      "name": "실버데이",
+      "month": 7,
+      "day_range": [12, 14],
+      "discount_rate": 10,
+      "categories": ["주얼리", "악세서리", "시계"]
+    },
+    {
+      "name": "허그데이",
+      "month": 12,
+      "day_range": [12, 14],
+      "discount_rate": 10,
+      "categories": ["의류", "담요", "쿠션", "겨울용품"]
+    },
+    {
+      "name": "삼일절",
+      "month": 3,
+      "day_range": [1, 1],
+      "discount_rate": 5,
+      "categories": ["국산제품", "전통식품"]
+    },
+    {
+      "name": "한글날",
+      "month": 10,
+      "day_range": [9, 9],
+      "discount_rate": 5,
+      "categories": ["도서", "문구", "국산제품"]
+    },
+    {
+      "name": "개천절",
+      "month": 10,
+      "day_range": [3, 3],
+      "discount_rate": 5,
+      "categories": ["전통식품", "국산제품"]
+    }
+  ],
+  "platform_sales": [
+    {
+      "platform": "쿠팡",
+      "name": "쿠팡데이",
+      "frequency": "monthly",
+      "typical_day": 11,
+      "discount_rate": 15,
+      "categories": ["로켓배송상품", "전체"]
+    },
+    {
+      "platform": "쿠팡",
+      "name": "로켓와우데이",
+      "frequency": "weekly",
+      "typical_day_of_week": "monday",
+      "discount_rate": 10,
+      "categories": ["와우회원전용"]
+    },
+    {
+      "platform": "11번가",
+      "name": "십일절",
+      "frequency": "monthly",
+      "typical_day": 11,
+      "discount_rate": 11,
+      "categories": ["전체"]
+    },
+    {
+      "platform": "11번가",
+      "name": "아마존글로벌데이",
+      "frequency": "quarterly",
+      "discount_rate": 20,
+      "categories": ["해외직구"]
+    },
+    {
+      "platform": "G마켓",
+      "name": "슈퍼딜",
+      "frequency": "daily",
+      "discount_rate": 25,
+      "categories": ["한정수량"]
+    },
+    {
+      "platform": "G마켓",
+      "name": "빅스마일데이",
+      "frequency": "biannual",
+      "typical_months": [5, 11],
+      "discount_rate": 30,
+      "categories": ["전체"]
+    },
+    {
+      "platform": "옥션",
+      "name": "올킬특가",
+      "frequency": "daily",
+      "discount_rate": 30,
+      "categories": ["한정수량"]
+    },
+    {
+      "platform": "위메프",
+      "name": "특가데이",
+      "frequency": "daily",
+      "discount_rate": 20,
+      "categories": ["타임딜"]
+    },
+    {
+      "platform": "티몬",
+      "name": "티몬데이",
+      "frequency": "monthly",
+      "typical_day": 1,
+      "discount_rate": 15,
+      "categories": ["전체"]
+    },
+    {
+      "platform": "SSG",
+      "name": "쓱데이",
+      "frequency": "biannual",
+      "typical_months": [5, 11],
+      "discount_rate": 25,
+      "categories": ["전체"]
+    },
+    {
+      "platform": "롯데온",
+      "name": "롯데온세일",
+      "frequency": "monthly",
+      "discount_rate": 20,
+      "categories": ["롯데계열상품"]
+    },
+    {
+      "platform": "네이버쇼핑",
+      "name": "브랜드데이",
+      "frequency": "weekly",
+      "discount_rate": 15,
+      "categories": ["브랜드별"]
+    },
+    {
+      "platform": "카카오쇼핑",
+      "name": "선물하기특가",
+      "frequency": "seasonal",
+      "discount_rate": 15,
+      "categories": ["선물용품"]
+    },
+    {
+      "platform": "무신사",
+      "name": "무신사데이",
+      "frequency": "monthly",
+      "typical_day": 29,
+      "discount_rate": 20,
+      "categories": ["패션", "스니커즈"]
+    },
+    {
+      "platform": "올리브영",
+      "name": "올영세일",
+      "frequency": "quarterly",
+      "discount_rate": 50,
+      "categories": ["뷰티", "헬스케어"]
+    },
+    {
+      "platform": "마켓컬리",
+      "name": "컬리세일",
+      "frequency": "weekly",
+      "discount_rate": 20,
+      "categories": ["식품", "신선식품"]
+    },
+    {
+      "platform": "오늘의집",
+      "name": "오늘의딜",
+      "frequency": "daily",
+      "discount_rate": 30,
+      "categories": ["가구", "인테리어"]
     }
   ],
   "category_seasonality": {
-    "에어컨": {"peak_months": [5, 6, 7], "low_months": [11, 12, 1, 2]},
-    "난방기": {"peak_months": [10, 11, 12], "low_months": [5, 6, 7, 8]},
-    "선풍기": {"peak_months": [5, 6, 7, 8], "low_months": [10, 11, 12, 1]},
-    "가습기": {"peak_months": [10, 11, 12, 1], "low_months": [5, 6, 7, 8]},
-    "제습기": {"peak_months": [6, 7, 8], "low_months": [11, 12, 1, 2]},
-    "겨울의류": {"peak_months": [10, 11, 12], "low_months": [4, 5, 6, 7]},
-    "여름의류": {"peak_months": [5, 6, 7], "low_months": [10, 11, 12, 1]},
-    "캠핑용품": {"peak_months": [4, 5, 9, 10], "low_months": [12, 1, 2]},
-    "스키용품": {"peak_months": [11, 12, 1, 2], "low_months": [5, 6, 7, 8]}
+    "에어컨": {"peak_months": [5, 6, 7], "low_months": [11, 12, 1, 2], "peak_discount": -10, "low_discount": 20},
+    "난방기": {"peak_months": [10, 11, 12], "low_months": [5, 6, 7, 8], "peak_discount": -5, "low_discount": 25},
+    "선풍기": {"peak_months": [5, 6, 7, 8], "low_months": [10, 11, 12, 1], "peak_discount": -5, "low_discount": 30},
+    "가습기": {"peak_months": [10, 11, 12, 1], "low_months": [5, 6, 7, 8], "peak_discount": 0, "low_discount": 20},
+    "제습기": {"peak_months": [6, 7, 8], "low_months": [11, 12, 1, 2], "peak_discount": -5, "low_discount": 25},
+    "겨울의류": {"peak_months": [10, 11, 12], "low_months": [4, 5, 6, 7], "peak_discount": 0, "low_discount": 50},
+    "여름의류": {"peak_months": [5, 6, 7], "low_months": [10, 11, 12, 1], "peak_discount": 0, "low_discount": 50},
+    "캠핑용품": {"peak_months": [4, 5, 9, 10], "low_months": [12, 1, 2], "peak_discount": 0, "low_discount": 30},
+    "스키용품": {"peak_months": [11, 12, 1, 2], "low_months": [5, 6, 7, 8], "peak_discount": 0, "low_discount": 40},
+    "수영용품": {"peak_months": [6, 7, 8], "low_months": [10, 11, 12, 1, 2], "peak_discount": 0, "low_discount": 50},
+    "크리스마스용품": {"peak_months": [11, 12], "low_months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "peak_discount": 0, "low_discount": 70},
+    "장마용품": {"peak_months": [6, 7], "low_months": [10, 11, 12, 1, 2, 3], "peak_discount": 0, "low_discount": 30},
+    "봄아우터": {"peak_months": [3, 4, 5], "low_months": [7, 8, 9], "peak_discount": 0, "low_discount": 40},
+    "가을아우터": {"peak_months": [9, 10, 11], "low_months": [3, 4, 5], "peak_discount": 0, "low_discount": 40},
+    "다이어트용품": {"peak_months": [1, 3, 4], "low_months": [11, 12], "peak_discount": 0, "low_discount": 20},
+    "졸업선물": {"peak_months": [2], "low_months": [4, 5, 6, 7, 8, 9, 10, 11, 12], "peak_discount": -5, "low_discount": 15},
+    "입학용품": {"peak_months": [2, 3], "low_months": [5, 6, 7, 8, 9, 10, 11, 12], "peak_discount": -5, "low_discount": 20},
+    "화이트데이선물": {"peak_months": [3], "low_months": [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2], "peak_discount": 0, "low_discount": 0},
+    "어린이용품": {"peak_months": [5], "low_months": [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4], "peak_discount": -5, "low_discount": 20},
+    "와인": {"peak_months": [11, 12], "low_months": [1, 2, 3, 4, 5, 6, 7, 8], "peak_discount": 10, "low_discount": 25}
+  },
+  "monthly_themes": {
+    "1": {
+      "name": "새해/신년",
+      "keywords": ["새해", "신년", "다이어트", "운동", "자기계발", "플래너", "다이어리"],
+      "hot_categories": ["운동기구", "다이어트식품", "플래너", "다이어리", "자기계발서"]
+    },
+    "2": {
+      "name": "졸업/입학/발렌타인",
+      "keywords": ["졸업", "입학", "발렌타인", "초콜릿", "신학기"],
+      "hot_categories": ["노트북", "선물용품", "초콜릿", "학용품", "가방"]
+    },
+    "3": {
+      "name": "봄/화이트데이",
+      "keywords": ["봄", "화이트데이", "봄옷", "이사", "집들이"],
+      "hot_categories": ["봄의류", "사탕", "선물용품", "인테리어", "이사용품"]
+    },
+    "4": {
+      "name": "봄나들이/아웃도어",
+      "keywords": ["벚꽃", "나들이", "피크닉", "캠핑", "자전거"],
+      "hot_categories": ["아웃도어", "캠핑용품", "자전거", "피크닉용품", "카메라"]
+    },
+    "5": {
+      "name": "가정의달",
+      "keywords": ["어린이날", "어버이날", "스승의날", "가족"],
+      "hot_categories": ["장난감", "건강식품", "안마기", "효도선물", "가전"]
+    },
+    "6": {
+      "name": "여름준비/장마",
+      "keywords": ["여름", "장마", "냉방", "우산", "제습"],
+      "hot_categories": ["에어컨", "선풍기", "제습기", "우산", "여름의류"]
+    },
+    "7": {
+      "name": "휴가시즌",
+      "keywords": ["휴가", "바캉스", "여행", "수영", "해변"],
+      "hot_categories": ["여행용품", "수영복", "선크림", "캐리어", "캠핑용품"]
+    },
+    "8": {
+      "name": "여름휴가/개학준비",
+      "keywords": ["휴가", "개학", "신학기", "백투스쿨"],
+      "hot_categories": ["학용품", "노트북", "태블릿", "가방", "의류"]
+    },
+    "9": {
+      "name": "가을/추석",
+      "keywords": ["추석", "가을", "선물세트", "명절"],
+      "hot_categories": ["선물세트", "건강식품", "가을의류", "과일", "한우"]
+    },
+    "10": {
+      "name": "가을/핼러윈",
+      "keywords": ["가을", "핼러윈", "단풍", "등산"],
+      "hot_categories": ["가을아우터", "등산용품", "핼러윈용품", "코스튬"]
+    },
+    "11": {
+      "name": "쇼핑대전/블프",
+      "keywords": ["블랙프라이데이", "광군제", "쇼핑대전", "빼빼로데이"],
+      "hot_categories": ["전자제품", "가전", "패션", "뷰티", "과자"]
+    },
+    "12": {
+      "name": "연말/크리스마스",
+      "keywords": ["크리스마스", "연말", "겨울", "선물", "파티"],
+      "hot_categories": ["크리스마스선물", "파티용품", "겨울의류", "난방가전", "와인"]
+    }
   },
   "price_trend_factors": {
     "new_release_premium": 0.15,
     "aging_discount_per_month": 0.02,
     "competition_discount": 0.05,
-    "holiday_premium": 0.08
+    "holiday_premium": 0.08,
+    "weekend_premium": 0.03,
+    "stock_clearance": 0.30,
+    "seasonal_clearance": 0.40,
+    "membership_discount": 0.05,
+    "bulk_purchase_discount": 0.10,
+    "first_purchase_discount": 0.10
+  },
+  "time_based_deals": {
+    "타임딜": {
+      "typical_hours": ["10:00", "14:00", "19:00"],
+      "duration_minutes": 60,
+      "discount_rate": 30
+    },
+    "점심특가": {
+      "typical_hours": ["11:00", "12:00"],
+      "duration_minutes": 120,
+      "discount_rate": 15,
+      "categories": ["식품", "배달"]
+    },
+    "저녁특가": {
+      "typical_hours": ["18:00", "19:00"],
+      "duration_minutes": 180,
+      "discount_rate": 20,
+      "categories": ["식품", "생활용품"]
+    },
+    "야간특가": {
+      "typical_hours": ["22:00", "23:00"],
+      "duration_minutes": 120,
+      "discount_rate": 25
+    },
+    "새벽배송마감": {
+      "typical_hours": ["22:00"],
+      "duration_minutes": 60,
+      "discount_rate": 10,
+      "categories": ["신선식품", "마켓컬리"]
+    }
+  },
+  "payment_promotions": {
+    "카드사별": [
+      {"card": "삼성카드", "typical_discount": 10, "typical_categories": ["삼성전자", "가전"]},
+      {"card": "현대카드", "typical_discount": 10, "typical_categories": ["백화점", "프리미엄"]},
+      {"card": "신한카드", "typical_discount": 10, "typical_categories": ["온라인쇼핑"]},
+      {"card": "KB국민카드", "typical_discount": 10, "typical_categories": ["대형마트"]},
+      {"card": "롯데카드", "typical_discount": 15, "typical_categories": ["롯데계열"]},
+      {"card": "NH농협카드", "typical_discount": 10, "typical_categories": ["농수산물", "식품"]}
+    ],
+    "간편결제별": [
+      {"method": "네이버페이", "typical_discount": 3, "note": "포인트 적립"},
+      {"method": "카카오페이", "typical_discount": 3, "note": "포인트 적립"},
+      {"method": "토스페이", "typical_discount": 5, "note": "신규가입 혜택"},
+      {"method": "페이코", "typical_discount": 5, "note": "포인트 사용가능"},
+      {"method": "삼성페이", "typical_discount": 3, "note": "삼성포인트 적립"}
+    ]
+  },
+  "membership_benefits": {
+    "쿠팡_로켓와우": {
+      "monthly_fee": 4990,
+      "benefits": ["무료배송", "로켓배송", "쿠팡플레이", "로켓프레시"],
+      "typical_discount": 5
+    },
+    "네이버_플러스": {
+      "monthly_fee": 4900,
+      "benefits": ["적립률UP", "무료배송쿠폰", "네이버시리즈"],
+      "typical_discount": 4
+    },
+    "SSG_신세계유니버스": {
+      "monthly_fee": 4900,
+      "benefits": ["무료배송", "SSG머니적립", "신세계백화점혜택"],
+      "typical_discount": 5
+    },
+    "마켓컬리_컬리패스": {
+      "monthly_fee": 4900,
+      "benefits": ["무료배송", "컬리머니적립"],
+      "typical_discount": 5
+    },
+    "오아시스_그린멤버십": {
+      "monthly_fee": 3900,
+      "benefits": ["무료배송", "추가적립"],
+      "typical_discount": 5
+    }
   }
 }

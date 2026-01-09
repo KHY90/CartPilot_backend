@@ -673,6 +673,250 @@ class PricePredictor:
             potential_savings=potential_savings,
         )
 
+    def get_platform_sales(
+        self,
+        platform: Optional[str] = None,
+        frequency: Optional[str] = None,
+    ) -> List[dict]:
+        """
+        플랫폼별 세일 정보 조회
+
+        Args:
+            platform: 특정 플랫폼 (쿠팡, 11번가 등)
+            frequency: 빈도 필터 (daily, weekly, monthly, biannual)
+
+        Returns:
+            List[dict]: 플랫폼 세일 정보
+        """
+        platform_sales = self.sale_calendar.get("platform_sales", [])
+        results = []
+
+        for sale in platform_sales:
+            # 플랫폼 필터
+            if platform and sale.get("platform") != platform:
+                continue
+            # 빈도 필터
+            if frequency and sale.get("frequency") != frequency:
+                continue
+            results.append(sale)
+
+        return results
+
+    def get_monthly_theme(self, month: Optional[int] = None) -> dict:
+        """
+        월별 쇼핑 테마 조회
+
+        Args:
+            month: 월 (1-12), None이면 현재 월
+
+        Returns:
+            dict: {name, keywords, hot_categories}
+        """
+        if month is None:
+            month = datetime.utcnow().month
+
+        monthly_themes = self.sale_calendar.get("monthly_themes", {})
+        theme = monthly_themes.get(str(month), {})
+
+        return {
+            "month": month,
+            "name": theme.get("name", ""),
+            "keywords": theme.get("keywords", []),
+            "hot_categories": theme.get("hot_categories", []),
+        }
+
+    def get_time_based_deals(self) -> List[dict]:
+        """
+        시간대별 딜 정보 조회
+
+        Returns:
+            List[dict]: 타임딜 정보
+        """
+        time_based_deals = self.sale_calendar.get("time_based_deals", {})
+        now = datetime.utcnow()
+        current_hour = now.hour
+
+        results = []
+        for deal_type, info in time_based_deals.items():
+            typical_hours = info.get("typical_hours", [])
+            duration = info.get("duration_minutes", 60)
+
+            # 현재 진행 중인지 확인
+            is_active = False
+            next_time = None
+            for hour_str in typical_hours:
+                hour = int(hour_str.split(":")[0])
+                if hour <= current_hour < hour + (duration // 60):
+                    is_active = True
+                    break
+                if hour > current_hour and (next_time is None or hour < next_time):
+                    next_time = hour
+
+            results.append({
+                "type": deal_type,
+                "typical_hours": typical_hours,
+                "duration_minutes": duration,
+                "discount_rate": info.get("discount_rate", 0),
+                "categories": info.get("categories", []),
+                "is_active": is_active,
+                "next_time": f"{next_time}:00" if next_time else None,
+            })
+
+        return results
+
+    def get_payment_promotions(self) -> dict:
+        """
+        결제 수단별 프로모션 정보 조회
+
+        Returns:
+            dict: {카드사별, 간편결제별}
+        """
+        return self.sale_calendar.get("payment_promotions", {
+            "카드사별": [],
+            "간편결제별": [],
+        })
+
+    def get_membership_benefits(self, platform: Optional[str] = None) -> dict:
+        """
+        멤버십 혜택 정보 조회
+
+        Args:
+            platform: 특정 플랫폼 (쿠팡, 네이버 등)
+
+        Returns:
+            dict: 멤버십 정보
+        """
+        membership_benefits = self.sale_calendar.get("membership_benefits", {})
+
+        if platform:
+            # 플랫폼명으로 검색
+            platform_lower = platform.lower()
+            for name, info in membership_benefits.items():
+                if platform_lower in name.lower():
+                    return {name: info}
+            return {}
+
+        return membership_benefits
+
+    def get_category_seasonality(self, category: str) -> Optional[dict]:
+        """
+        카테고리별 계절성 정보 조회
+
+        Args:
+            category: 카테고리명
+
+        Returns:
+            dict: {peak_months, low_months, peak_discount, low_discount}
+        """
+        category_seasonality = self.sale_calendar.get("category_seasonality", {})
+
+        # 정확한 매칭
+        if category in category_seasonality:
+            return category_seasonality[category]
+
+        # 부분 매칭
+        category_lower = category.lower()
+        for cat, info in category_seasonality.items():
+            if cat.lower() in category_lower or category_lower in cat.lower():
+                return info
+
+        return None
+
+    def get_best_purchase_timing(
+        self,
+        category: Optional[str] = None,
+        days_ahead: int = 60,
+    ) -> dict:
+        """
+        최적 구매 타이밍 종합 분석
+
+        Args:
+            category: 상품 카테고리
+            days_ahead: 분석 기간
+
+        Returns:
+            dict: 종합 구매 타이밍 분석 결과
+        """
+        now = datetime.utcnow()
+        current_month = now.month
+
+        # 1. 다가오는 세일 확인
+        upcoming_sales = self.get_upcoming_sales(category=category, days_ahead=days_ahead)
+
+        # 2. 월별 테마 확인
+        monthly_theme = self.get_monthly_theme(current_month)
+        is_hot_category = category and category in monthly_theme.get("hot_categories", [])
+
+        # 3. 계절성 확인
+        seasonality = None
+        is_peak_season = False
+        is_low_season = False
+        if category:
+            seasonality = self.get_category_seasonality(category)
+            if seasonality:
+                is_peak_season = current_month in seasonality.get("peak_months", [])
+                is_low_season = current_month in seasonality.get("low_months", [])
+
+        # 4. 플랫폼 세일 확인
+        platform_sales = self.get_platform_sales()
+        active_platform_deals = [
+            s for s in platform_sales
+            if s.get("frequency") in ["daily", "weekly"]
+        ]
+
+        # 5. 시간대 딜 확인
+        time_deals = self.get_time_based_deals()
+        active_time_deals = [d for d in time_deals if d.get("is_active")]
+
+        # 6. 결제 프로모션
+        payment_promos = self.get_payment_promotions()
+
+        # 종합 추천 생성
+        recommendations = []
+
+        if upcoming_sales and upcoming_sales[0].days_until <= 14:
+            sale = upcoming_sales[0]
+            recommendations.append(
+                f"{sale.days_until}일 후 {sale.name} 예상 ({sale.expected_discount}% 할인 예상)"
+            )
+
+        if is_low_season and seasonality:
+            low_discount = seasonality.get("low_discount", 0)
+            recommendations.append(
+                f"현재 비수기입니다. 평균 {low_discount}% 할인 기대"
+            )
+
+        if is_peak_season:
+            recommendations.append("현재 수요가 높은 시즌입니다. 빠른 구매 권장")
+
+        if is_hot_category:
+            recommendations.append(f"이번 달 인기 카테고리: {monthly_theme.get('name', '')}")
+
+        if active_time_deals:
+            recommendations.append(
+                f"타임딜 진행 중: {', '.join(d['type'] for d in active_time_deals)}"
+            )
+
+        if payment_promos.get("카드사별"):
+            top_card = payment_promos["카드사별"][0]
+            recommendations.append(
+                f"결제 팁: {top_card['card']} {top_card['typical_discount']}% 할인"
+            )
+
+        return {
+            "category": category,
+            "current_month": current_month,
+            "monthly_theme": monthly_theme,
+            "is_peak_season": is_peak_season,
+            "is_low_season": is_low_season,
+            "seasonality": seasonality,
+            "upcoming_sales": upcoming_sales[:3],
+            "active_platform_deals": len(active_platform_deals),
+            "active_time_deals": active_time_deals,
+            "payment_promotions": payment_promos,
+            "recommendations": recommendations,
+        }
+
 
 # 싱글톤 인스턴스
 _price_predictor: PricePredictor | None = None

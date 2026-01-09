@@ -12,12 +12,12 @@ services:
       - .env
     environment:
       - POSTGRES_HOST=db
-      - REDIS_HOST=redis
+      # - REDIS_HOST=redis  # Redis 비활성화
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      # redis:  # Redis 비활성화
+      #   condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -45,20 +45,21 @@ services:
       retries: 5
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: cartpilot-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+  # === Redis 서비스 (비활성화) ===
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: cartpilot-redis
+  #   ports:
+  #     - "${REDIS_PORT:-6379}:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
+  # redis_data:  # Redis 비활성화

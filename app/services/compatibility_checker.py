@@ -242,6 +242,181 @@ class CompatibilityChecker:
 
         return suggestions[:max_suggestions]
 
+    def get_upgrade_suggestions(
+        self,
+        item: str,
+        level: str = "다음단계",
+    ) -> List[dict]:
+        """
+        업그레이드 제안
+
+        Args:
+            item: 현재 품목
+            level: "다음단계" 또는 "고급업그레이드"
+
+        Returns:
+            List[dict]: 업그레이드 제안 [{name, reason}]
+        """
+        upgrade_suggestions = self.rules.get("upgrade_suggestions", {})
+        normalized = self._normalize_item(item)
+        suggestions = []
+
+        # 품목에 해당하는 업그레이드 찾기
+        for category, upgrades in upgrade_suggestions.items():
+            category_lower = category.lower()
+            if category_lower in normalized or normalized in category_lower:
+                items = upgrades.get(level, [])
+                for upgrade_item in items:
+                    suggestions.append({
+                        "name": upgrade_item,
+                        "reason": f"{category} 업그레이드 추천",
+                        "level": level,
+                    })
+                break
+
+        return suggestions
+
+    def get_gift_recommendations(
+        self,
+        occasion: Optional[str] = None,
+        recipient: Optional[str] = None,
+        age_group: Optional[str] = None,
+    ) -> List[str]:
+        """
+        선물 추천
+
+        Args:
+            occasion: 행사 (생일, 결혼, 집들이 등)
+            recipient: 대상 (남성, 여성)
+            age_group: 연령대 (20대, 30대)
+
+        Returns:
+            List[str]: 추천 선물 카테고리 리스트
+        """
+        gift_recommendations = self.rules.get("gift_recommendations", {})
+
+        # 키 조합 생성 (예: "생일_남성_20대", "결혼선물", "집들이")
+        possible_keys = []
+
+        if occasion and recipient and age_group:
+            possible_keys.append(f"{occasion}_{recipient}_{age_group}")
+        if occasion and recipient:
+            possible_keys.append(f"{occasion}_{recipient}")
+        if occasion:
+            possible_keys.append(f"{occasion}선물")
+            possible_keys.append(occasion)
+        if recipient and age_group:
+            possible_keys.append(f"{recipient}_{age_group}")
+
+        # 매칭되는 추천 찾기
+        for key in possible_keys:
+            if key in gift_recommendations:
+                return gift_recommendations[key]
+
+        # 부분 매칭 시도
+        for gift_key, items in gift_recommendations.items():
+            if occasion and occasion in gift_key:
+                return items
+            if recipient and recipient in gift_key:
+                return items
+
+        return []
+
+    def get_brand_accessories(self, brand: str) -> dict:
+        """
+        브랜드별 호환 액세서리 조회
+
+        Args:
+            brand: 브랜드명
+
+        Returns:
+            dict: {compatible_accessories, note}
+        """
+        brand_compatibility = self.rules.get("brand_compatibility", {})
+
+        # 정확한 매칭
+        if brand in brand_compatibility:
+            return brand_compatibility[brand]
+
+        # 부분 매칭
+        brand_lower = brand.lower()
+        for b, data in brand_compatibility.items():
+            if b.lower() in brand_lower or brand_lower in b.lower():
+                return data
+
+        return {"compatible_accessories": [], "note": ""}
+
+    def get_price_tier_info(self, tier: str = "mid_range") -> dict:
+        """
+        가격 티어 정보 조회
+
+        Args:
+            tier: budget, mid_range, premium, luxury
+
+        Returns:
+            dict: {label, multiplier, quality_note}
+        """
+        price_tiers = self.rules.get("price_tiers", {})
+        return price_tiers.get(tier, {
+            "label": "균형",
+            "multiplier": 1.0,
+            "quality_note": "성능과 가격의 균형"
+        })
+
+    def analyze_bundle_for_gift(
+        self,
+        items: List[str],
+        occasion: Optional[str] = None,
+        recipient: Optional[str] = None,
+    ) -> dict:
+        """
+        선물용 번들 분석
+
+        Args:
+            items: 품목 리스트
+            occasion: 행사
+            recipient: 대상
+
+        Returns:
+            dict: {is_suitable, score, suggestions, missing_items}
+        """
+        # 기본 호환성 검사
+        compatibility = self.check_compatibility(items)
+
+        # 선물 추천 품목 가져오기
+        recommended_gifts = self.get_gift_recommendations(
+            occasion=occasion,
+            recipient=recipient,
+        )
+
+        normalized_items = [self._normalize_item(item) for item in items]
+
+        # 추천 품목 중 포함된 것 확인
+        included = []
+        missing = []
+        for gift in recommended_gifts:
+            gift_lower = gift.lower()
+            if any(gift_lower in item or item in gift_lower for item in normalized_items):
+                included.append(gift)
+            else:
+                missing.append(gift)
+
+        # 점수 계산 (포함된 추천 품목 비율)
+        score = len(included) / len(recommended_gifts) * 100 if recommended_gifts else 50
+
+        # 적합성 판단
+        is_suitable = score >= 30 or len(included) >= 1
+
+        return {
+            "is_suitable": is_suitable,
+            "score": round(score, 1),
+            "included_recommendations": included,
+            "missing_recommendations": missing[:3],
+            "compatibility": compatibility,
+            "occasion": occasion,
+            "recipient": recipient,
+        }
+
 
 # 싱글톤 인스턴스
 _compatibility_checker: CompatibilityChecker | None = None
