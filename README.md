@@ -22,13 +22,16 @@ CartPilot은 AI 기반 스마트 쇼핑 어시스턴트입니다. 사용자의 �
 
 | 분류 | 기술 |
 |------|------|
-| **Framework** | FastAPI |
-| **AI/LLM** | LangGraph 1.0+, LangChain 1.2+, OpenAI/Gemini |
+| **Framework** | FastAPI 0.109+ |
+| **AI/LLM** | LangGraph 1.0+, LangChain 1.2+, OpenAI (gpt-4o-mini) / Gemini |
 | **Language** | Python 3.11+ |
-| **Database** | PostgreSQL 16 (pgvector), Redis 7 |
-| **ORM** | SQLAlchemy 2.0 (Async) |
+| **Database** | PostgreSQL 16 + SQLAlchemy 2.0 (Async) |
+| **Caching** | 인메모리 캐싱 (asyncio.Lock 기반) |
+| **Session** | 인메모리 세션 스토어 |
 | **Migration** | Alembic |
-| **Auth** | JWT (Access/Refresh Token), OAuth 2.0 |
+| **Auth** | JWT (Access/Refresh Token), OAuth 2.0 (카카오, 네이버) |
+| **Scheduling** | APScheduler (가격 모니터링) |
+| **Price Prediction** | Prophet (시계열 예측) |
 | **Validation** | Pydantic v2 |
 
 ## 프로젝트 구조
@@ -37,55 +40,73 @@ CartPilot은 AI 기반 스마트 쇼핑 어시스턴트입니다. 사용자의 �
 Backend/
 ├── app/
 │   ├── agents/              # LangGraph AI 에이전트
-│   │   ├── analyzer.py          # 의도 분석 + 요구사항 추출
+│   │   ├── analyzer.py          # 의도 분석 + 요구사항 추출 (단일 LLM 호출)
 │   │   ├── gift_agent.py        # GIFT 모드 (선물 추천)
-│   │   ├── value_agent.py       # VALUE 모드 (가성비 추천)
-│   │   ├── bundle_agent.py      # BUNDLE 모드 (묶음 구매)
-│   │   ├── review_agent.py      # REVIEW 모드 (리뷰 분석)
+│   │   ├── value_agent.py       # VALUE 모드 (가성비 추천, 3티어)
+│   │   ├── bundle_agent.py      # BUNDLE 모드 (묶음 구매 최적화)
+│   │   ├── review_agent.py      # REVIEW 모드 (리뷰 분석 검증)
 │   │   ├── trend_agent.py       # TREND 모드 (트렌드 추천)
 │   │   ├── validation_agent.py  # 상품 적합성 검증
-│   │   ├── orchestrator.py      # 에이전트 오케스트레이션
-│   │   └── state.py             # 에이전트 상태 정의
+│   │   ├── orchestrator.py      # LangGraph 오케스트레이션
+│   │   ├── state.py             # 에이전트 상태 정의
+│   │   ├── intent_classifier.py # 의도 분류기
+│   │   └── requirement_extractor.py # 요구사항 추출기
 │   ├── api/                 # API 엔드포인트
 │   │   ├── auth.py              # 인증 (소셜 로그인, JWT)
-│   │   ├── chat.py              # AI 채팅
+│   │   ├── chat.py              # AI 채팅 (메인 API)
 │   │   ├── wishlist.py          # 관심상품 관리
 │   │   ├── ratings.py           # 상품 평점
+│   │   ├── combination_ratings.py # 묶음 상품 평점
 │   │   ├── purchases.py         # 구매 기록
 │   │   ├── preferences.py       # 사용자 선호도
+│   │   ├── bundle.py            # 묶음 상품 관리
 │   │   ├── admin.py             # 관리자 기능
-│   │   ├── graph.py             # 그래프 시각화
+│   │   ├── graph.py             # LangGraph 시각화 (Mermaid/ASCII)
 │   │   └── health.py            # 헬스체크
 │   ├── models/              # SQLAlchemy & Pydantic 모델
 │   │   ├── user.py              # 사용자 모델
 │   │   ├── wishlist.py          # 관심상품/가격이력 모델
 │   │   ├── rating.py            # 평점 모델
+│   │   ├── combination_rating.py # 묶음 평점 모델
 │   │   ├── purchase.py          # 구매 기록 모델
 │   │   ├── product.py           # 상품 모델
-│   │   └── ...
+│   │   ├── review.py            # 리뷰 인사이트 모델
+│   │   ├── session.py           # 세션 상태 모델
+│   │   ├── request.py           # 요청 모델 (IntentType, Requirements)
+│   │   ├── response.py          # 응답 모델 (ChatResponse)
+│   │   ├── recommendation.py    # 추천 결과 모델
+│   │   └── price_prediction.py  # 가격 예측 모델
 │   ├── services/            # 비즈니스 로직 서비스
 │   │   ├── oauth/               # OAuth 서비스
+│   │   │   ├── base.py              # OAuth 기본 클래스
 │   │   │   ├── kakao.py             # 카카오 OAuth
 │   │   │   └── naver.py             # 네이버 OAuth
 │   │   ├── notifications/       # 알림 서비스
-│   │   │   ├── notification_manager.py  # 알림 관리자
-│   │   │   ├── kakao_message.py     # 카카오톡 메시지
+│   │   │   ├── notification_manager.py  # 알림 관리자 (카카오톡 우선)
+│   │   │   ├── kakao_message.py     # 카카오톡 "나에게 보내기"
 │   │   │   └── email_service.py     # 이메일 발송
 │   │   ├── llm_provider.py      # LLM 제공자 (OpenAI/Gemini)
 │   │   ├── naver_shopping.py    # 네이버 쇼핑 API
 │   │   ├── price_monitor.py     # 가격 모니터링
-│   │   ├── preference_analyzer.py # 선호도 분석
+│   │   ├── price_predictor.py   # Prophet 기반 가격 예측
+│   │   ├── preference_analyzer.py # 사용자 성향 분석
+│   │   ├── sentiment_analyzer.py  # 리뷰 감정 분석
+│   │   ├── review_crawler.py    # 리뷰 크롤링
+│   │   ├── keyword_expander.py  # 검색 키워드 확장
+│   │   ├── budget_optimizer.py  # 예산 최적화
+│   │   ├── compatibility_checker.py # 제품 호환성 검사
+│   │   ├── recommendation_reranker.py # 추천 재정렬
 │   │   ├── jwt_service.py       # JWT 토큰 관리
-│   │   ├── scheduler.py         # 백그라운드 스케줄러
-│   │   ├── cache.py             # 캐시 서비스
-│   │   └── session_store.py     # 세션 저장소
+│   │   ├── scheduler.py         # APScheduler (가격 모니터링)
+│   │   ├── cache.py             # 인메모리 캐시 (Redis 비활성화)
+│   │   └── session_store.py     # 인메모리 세션 저장소
 │   ├── dependencies/        # FastAPI 의존성
 │   │   └── auth.py              # 인증 의존성
 │   ├── utils/               # 유틸리티
-│   │   ├── graph_visualizer.py  # 그래프 시각화
+│   │   ├── graph_visualizer.py  # LangGraph 시각화
 │   │   └── text_parser.py       # 텍스트 파싱
-│   ├── config.py            # 환경 설정
-│   ├── database.py          # DB 연결 설정
+│   ├── config.py            # 환경 설정 (Pydantic Settings)
+│   ├── database.py          # DB 연결 설정 (비동기)
 │   └── main.py              # FastAPI 앱 진입점
 ├── alembic/                 # DB 마이그레이션
 │   ├── versions/                # 마이그레이션 스크립트
@@ -200,9 +221,9 @@ POSTGRES_USER=cartpilot
 POSTGRES_PASSWORD=cartpilot123
 POSTGRES_DB=cartpilot
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# Redis (현재 비활성화 - 인메모리 캐시 사용 중)
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
 
 # 이메일 (선택)
 SMTP_HOST=smtp.gmail.com
@@ -235,13 +256,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### Docker 실행
 
 ```bash
-# 전체 스택 실행 (Backend + PostgreSQL + Redis)
+# 전체 스택 실행 (Backend + PostgreSQL)
 docker-compose up -d
 
 # 백엔드만 빌드 및 실행
 docker build -t cartpilot-backend .
 docker run -p 8000:8000 --env-file .env cartpilot-backend
 ```
+
+> **참고**: 현재 Redis는 비활성화되어 있으며 인메모리 캐싱을 사용합니다. 서버 재시작 시 캐시가 초기화됩니다.
 
 ## API 엔드포인트
 
@@ -290,6 +313,15 @@ docker run -p 8000:8000 --env-file .env cartpilot-backend
 | POST | `/api/ratings` | 평점 등록 |
 | GET | `/api/purchases` | 구매 기록 목록 |
 | POST | `/api/purchases` | 구매 기록 등록 |
+
+### 묶음 상품 API
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/api/bundles` | 저장된 묶음 상품 목록 |
+| POST | `/api/bundles` | 묶음 상품 저장 |
+| GET | `/api/combination-ratings` | 묶음 평점 목록 |
+| POST | `/api/combination-ratings` | 묶음 평점 등록 |
 
 ### 헬스체크
 
@@ -349,7 +381,13 @@ alembic history
 
 [백그라운드]
 Scheduler → Price Monitor → 가격 변동 감지 → Notification Manager → 카카오톡/이메일
+
+[캐싱/세션]
+인메모리 캐시 (asyncio.Lock) - 검색 결과, LLM 응답 캐싱
+인메모리 세션 (asyncio.Lock) - 대화 세션 관리
 ```
+
+> **참고**: 현재 Redis 없이 인메모리 캐싱을 사용합니다. 서버 재시작 시 캐시와 세션이 초기화됩니다.
 
 ## 검증 에이전트 (Validation Agent)
 
